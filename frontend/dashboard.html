@@ -94,11 +94,19 @@
             justify-content: center;
             color: white;
             font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .user-avatar:hover {
+            background: #2563eb;
         }
 
         .user-info {
             display: flex;
             flex-direction: column;
+            position: relative;
+            cursor: pointer;
         }
 
         .user-name {
@@ -125,6 +133,144 @@
 
         .logout-btn:hover {
             background: #dc2626;
+        }
+
+        /* User dropdown styles */
+        .user-info:hover .user-name {
+            color: #3b82f6;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 120px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-5px);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .user-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            color: #374151;
+            text-decoration: none;
+            font-size: 14px;
+            border: none;
+            background: none;
+            width: 100%;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f3f4f6;
+            color: #ef4444;
+        }
+
+        .dropdown-item i,
+        .dropdown-item svg {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: scale(0.9);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+
+        .modal-message {
+            color: #6b7280;
+            font-size: 16px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .modal-btn-primary {
+            background: #ef4444;
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background: #dc2626;
+        }
+
+        .modal-btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .modal-btn-secondary:hover {
+            background: #e5e7eb;
         }
 
         .dashboard-content {
@@ -174,6 +320,48 @@
             font-weight: 700;
             color: #059669;
             margin-bottom: 8px;
+        }
+
+        /* Balance Toggle Styles */
+        .hidden-balance, .actual-balance {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .balance-dots {
+            font-size: 24px;
+            font-weight: 700;
+            color: #6b7280;
+            letter-spacing: 2px;
+        }
+
+        .show-balance-btn, .hide-balance-btn {
+            background: linear-gradient(145deg, #0066cc, #004499);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .show-balance-btn:hover, .hide-balance-btn:hover {
+            background: linear-gradient(145deg, #004499, #003366);
+            transform: translateY(-1px);
+        }
+
+        .show-balance-btn:active, .hide-balance-btn:active {
+            transform: translateY(0);
+        }
+
+        .loading-balance {
+            opacity: 0.6;
+            pointer-events: none;
         }
 
         .quick-actions {
@@ -351,18 +539,27 @@
                 </div>
                 <nav>
                     <span style="color: #6b7280; margin-left: 32px;">
-                        VuBank Straight2Bank Dashboard
+                        Home Page
                     </span>
                 </nav>
             </div>
             
             <div class="dashboard-user">
                 <div class="user-avatar" id="userAvatar">U</div>
-                <div class="user-info">
+                <div class="user-info" id="userInfo">
                     <div class="user-name" id="userName">User</div>
                     <div class="user-details" id="userDetails">ID: - | Roles: -</div>
+                    <div class="user-dropdown" id="userDropdown">
+                        <button class="dropdown-item" id="logoutBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                                <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M16 17L21 12L16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Logout
+                        </button>
+                    </div>
                 </div>
-                <button id="logoutBtn" class="logout-btn">Logout</button>
             </div>
         </header>
 
@@ -451,7 +648,12 @@
                 this.userAvatar = document.getElementById('userAvatar');
                 this.userName = document.getElementById('userName');
                 this.userDetails = document.getElementById('userDetails');
+                this.userInfo = document.getElementById('userInfo');
+                this.userDropdown = document.getElementById('userDropdown');
                 this.logoutBtn = document.getElementById('logoutBtn');
+                this.logoutModal = document.getElementById('logoutModal');
+                this.cancelLogout = document.getElementById('cancelLogout');
+                this.confirmLogout = document.getElementById('confirmLogout');
                 this.loadingState = document.getElementById('loadingState');
                 this.errorState = document.getElementById('errorState');
                 this.errorMessage = document.getElementById('errorMessage');
@@ -462,7 +664,40 @@
             }
             
             initializeEventListeners() {
-                this.logoutBtn.addEventListener('click', () => this.handleLogout());
+                // User avatar click to toggle dropdown
+                this.userAvatar.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleUserDropdown();
+                });
+
+                // User info click to toggle dropdown
+                this.userInfo.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleUserDropdown();
+                });
+
+                // Logout button click to show modal
+                this.logoutBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showLogoutModal();
+                });
+
+                // Modal buttons
+                this.cancelLogout.addEventListener('click', () => this.hideLogoutModal());
+                this.confirmLogout.addEventListener('click', () => this.handleLogout());
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', () => {
+                    this.hideUserDropdown();
+                });
+
+                // Close modal when clicking overlay
+                this.logoutModal.addEventListener('click', (e) => {
+                    if (e.target === this.logoutModal) {
+                        this.hideLogoutModal();
+                    }
+                });
+
                 this.retryBtn.addEventListener('click', () => this.loadDashboardData());
             }
             
@@ -580,14 +815,14 @@
                                 <span class="balance-dots">••••••</span>
                                 <button class="show-balance-btn" onclick="dashboardManager.showBalance(${index})" 
                                         id="showBtn-${index}">
-                                    👁️ Show Balance
+                                    Show Balance
                                 </button>
                             </div>
                             <div id="actualBalance-${index}" class="actual-balance" style="display: none;">
                                 <span id="balanceAmount-${index}">${this.formatCurrency(account.balance, account.currency)}</span>
                                 <button class="hide-balance-btn" onclick="dashboardManager.hideBalance(${index})" 
                                         id="hideBtn-${index}">
-                                    🙈 Hide Balance
+                                    Hide Balance
                                 </button>
                             </div>
                         </div>
@@ -659,8 +894,28 @@
                 this.errorState.style.display = 'none';
                 this.mainContent.style.display = 'block';
             }
+
+            toggleUserDropdown() {
+                this.userDropdown.classList.toggle('show');
+            }
+
+            hideUserDropdown() {
+                this.userDropdown.classList.remove('show');
+            }
+
+            showLogoutModal() {
+                this.hideUserDropdown();
+                this.logoutModal.classList.add('show');
+            }
+
+            hideLogoutModal() {
+                this.logoutModal.classList.remove('show');
+            }
             
             handleLogout() {
+                // Hide modal
+                this.hideLogoutModal();
+                
                 // Clear stored authentication data
                 localStorage.removeItem('vubank_token');
                 localStorage.removeItem('vubank_user');
@@ -668,15 +923,87 @@
                 // Redirect to login page
                 window.location.href = 'login.html';
             }
+            
+            async showBalance(accountIndex) {
+                const hiddenBalanceDiv = document.getElementById(`hiddenBalance-${accountIndex}`);
+                const actualBalanceDiv = document.getElementById(`actualBalance-${accountIndex}`);
+                const showBtn = document.getElementById(`showBtn-${accountIndex}`);
+                const balanceAmount = document.getElementById(`balanceAmount-${accountIndex}`);
+                
+                // Add loading state
+                showBtn.innerHTML = 'Loading...';
+                showBtn.classList.add('loading-balance');
+                
+                try {
+                    // Fetch fresh balance from API
+                    const account = this.accounts[accountIndex];
+                    const response = await fetch(`http://localhost:8002/accounts/${account.id}/balance`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('vubank_token')}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Update the balance with fresh data from API
+                        balanceAmount.textContent = this.formatCurrency(data.balance, account.currency);
+                        
+                        // Update local account data
+                        this.accounts[accountIndex].balance = data.balance;
+                    } else {
+                        // Use cached balance if API fails
+                        console.warn('Failed to fetch fresh balance, using cached value');
+                    }
+                } catch (error) {
+                    console.error('Error fetching balance:', error);
+                    // Use cached balance if API fails
+                }
+                
+                // Show actual balance and hide the dots
+                hiddenBalanceDiv.style.display = 'none';
+                actualBalanceDiv.style.display = 'flex';
+                
+                console.log(`✅ Balance shown for account ${accountIndex}`);
+            }
+            
+            hideBalance(accountIndex) {
+                const hiddenBalanceDiv = document.getElementById(`hiddenBalance-${accountIndex}`);
+                const actualBalanceDiv = document.getElementById(`actualBalance-${accountIndex}`);
+                
+                // Hide actual balance and show the dots
+                actualBalanceDiv.style.display = 'none';
+                hiddenBalanceDiv.style.display = 'flex';
+                
+                // Reset button state
+                const showBtn = document.getElementById(`showBtn-${accountIndex}`);
+                showBtn.innerHTML = 'Show Balance';
+                showBtn.classList.remove('loading-balance');
+                
+                console.log(`🙈 Balance hidden for account ${accountIndex}`);
+            }
         }
         
         // Initialize dashboard manager when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
-            const dashboardManager = new DashboardManager();
+            window.dashboardManager = new DashboardManager();
             
-            // Make it available globally for debugging
-            window.dashboardManager = dashboardManager;
+            // Make it available globally for onclick handlers
+            console.log('✅ Dashboard Manager initialized with balance toggle functionality');
         });
     </script>
+
+    <!-- Logout Confirmation Modal -->
+    <div class="modal-overlay" id="logoutModal">
+        <div class="modal-content">
+            <h3 class="modal-title">Confirm Logout</h3>
+            <p class="modal-message">Are you sure you want to logout? You will be redirected to the login page.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" id="cancelLogout">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="confirmLogout">Logout</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
