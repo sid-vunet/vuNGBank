@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -11,13 +12,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
+	"go.elastic.co/apm/module/apmgin/v2"
+	"go.elastic.co/apm/module/apmsql/v2"
+	_ "go.elastic.co/apm/module/apmsql/v2/pq"
+	"go.elastic.co/apm/v2"
 )
 
 // Config struct
 type Config struct {
-	Port      string
-	JWTSecret string
-	DBConfig  DBConfig
+	Port           string
+	JWTSecret      string
+	DBConfig       DBConfig
+	APMServerURL   string
+	APMServiceName string
 }
 
 type DBConfig struct {
@@ -72,8 +79,10 @@ type Claims struct {
 // Load configuration
 func loadConfig() *Config {
 	return &Config{
-		Port:      getEnv("PUBLIC_API_PORT", "8002"),
-		JWTSecret: getEnv("JWT_SECRET", "your-super-secret-jwt-key"),
+		Port:           getEnv("PUBLIC_API_PORT", "8002"),
+		JWTSecret:      getEnv("JWT_SECRET", "your-super-secret-jwt-key"),
+		APMServerURL:   getEnv("ELASTIC_APM_SERVER_URL", "http://91.203.133.240:30200"),
+		APMServiceName: getEnv("ELASTIC_APM_SERVICE_NAME", "accounts-go-service"),
 		DBConfig: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
@@ -97,7 +106,8 @@ func connectDB(config DBConfig) (*sql.DB, error) {
 	connStr := "host=" + config.Host + " port=" + config.Port + " user=" + config.User +
 		" password=" + config.Password + " dbname=" + config.DBName + " sslmode=" + config.SSLMode
 
-	db, err := sql.Open("postgres", connStr)
+	// Use APM instrumented SQL driver
+	db, err := apmsql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +192,13 @@ func jwtMiddleware(jwtSecret string) gin.HandlerFunc {
 }
 
 // Get user accounts
-func getUserAccounts(db *sql.DB, userID string) ([]Account, error) {
+func getUserAccounts(ctx context.Context, db *sql.DB, userID string) ([]Account, error) {
+	span, ctx := apm.StartSpan(ctx, "database_accounts_lookup", "db.postgresql")
+	defer span.End()
+
+	span.Context.SetLabel("user_id", userID)
+	span.Context.SetLabel("operation", "get_accounts")
+
 	query := `
 		SELECT id, account_number, account_name, account_type, balance, currency, status
 		FROM accounts 
@@ -190,8 +206,10 @@ func getUserAccounts(db *sql.DB, userID string) ([]Account, error) {
 		ORDER BY created_at DESC
 	`
 
-	rows, err := db.Query(query, userID)
+	rows, err := db.QueryContext(ctx, query, userID)
 	if err != nil {
+		span.Context.SetLabel("query_result", "error")
+		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 	defer rows.Close()
@@ -209,16 +227,26 @@ func getUserAccounts(db *sql.DB, userID string) ([]Account, error) {
 			&account.Status,
 		)
 		if err != nil {
+			span.Context.SetLabel("scan_result", "error")
+			apm.CaptureError(ctx, err).Send()
 			return nil, err
 		}
 		accounts = append(accounts, account)
 	}
 
+	span.Context.SetLabel("query_result", "success")
+	span.Context.SetLabel("accounts_count", len(accounts))
 	return accounts, nil
 }
 
 // Get recent transactions for user
-func getRecentTransactions(db *sql.DB, userID string) ([]Transaction, error) {
+func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Transaction, error) {
+	span, ctx := apm.StartSpan(ctx, "database_transactions_lookup", "db.postgresql")
+	defer span.End()
+
+	span.Context.SetLabel("user_id", userID)
+	span.Context.SetLabel("operation", "get_recent_transactions")
+
 	query := `
 		SELECT t.id, t.transaction_type, t.amount, t.description, 
 			   t.reference_number, t.transaction_date, t.balance_after, t.status
@@ -229,8 +257,10 @@ func getRecentTransactions(db *sql.DB, userID string) ([]Transaction, error) {
 		LIMIT 20
 	`
 
-	rows, err := db.Query(query, userID)
+	rows, err := db.QueryContext(ctx, query, userID)
 	if err != nil {
+		span.Context.SetLabel("query_result", "error")
+		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 	defer rows.Close()
@@ -251,6 +281,8 @@ func getRecentTransactions(db *sql.DB, userID string) ([]Transaction, error) {
 			&transaction.Status,
 		)
 		if err != nil {
+			span.Context.SetLabel("scan_result", "error")
+			apm.CaptureError(ctx, err).Send()
 			return nil, err
 		}
 
@@ -258,6 +290,8 @@ func getRecentTransactions(db *sql.DB, userID string) ([]Transaction, error) {
 		transactions = append(transactions, transaction)
 	}
 
+	span.Context.SetLabel("query_result", "success")
+	span.Context.SetLabel("transactions_count", len(transactions))
 	return transactions, nil
 }
 
@@ -265,13 +299,34 @@ func getRecentTransactions(db *sql.DB, userID string) ([]Transaction, error) {
 func accountsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
+		rolesInterface, exists := c.Get("roles")
+		var roles []string
+		if exists {
+			if rolesSlice, ok := rolesInterface.([]string); ok {
+				roles = rolesSlice
+			}
+		}
+
+		// Create APM transaction
+		tx := apm.TransactionFromContext(c.Request.Context())
+		if tx != nil {
+			tx.Context.SetLabel("user_id", userID)
+			tx.Context.SetLabel("endpoint", "accounts")
+			tx.Context.SetLabel("user_roles", strings.Join(roles, ","))
+		}
 
 		log.Printf("Fetching accounts for user: %s", userID)
 
+		// Create span for business logic
+		span, ctx := apm.StartSpan(c.Request.Context(), "accounts_business_logic", "app")
+		defer span.End()
+
 		// Get user accounts
-		accounts, err := getUserAccounts(db, userID)
+		accounts, err := getUserAccounts(ctx, db, userID)
 		if err != nil {
 			log.Printf("Failed to get accounts: %v", err)
+			span.Context.SetLabel("accounts_result", "error")
+			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
 				Message: "Failed to retrieve accounts",
@@ -280,9 +335,11 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Get recent transactions
-		transactions, err := getRecentTransactions(db, userID)
+		transactions, err := getRecentTransactions(ctx, db, userID)
 		if err != nil {
 			log.Printf("Failed to get transactions: %v", err)
+			span.Context.SetLabel("transactions_result", "error")
+			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
 				Message: "Failed to retrieve transactions",
@@ -296,6 +353,15 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 			Transactions: transactions,
 		}
 
+		span.Context.SetLabel("accounts_result", "success")
+		span.Context.SetLabel("accounts_count", len(accounts))
+		span.Context.SetLabel("transactions_count", len(transactions))
+
+		if tx != nil {
+			tx.Context.SetLabel("response_accounts_count", len(accounts))
+			tx.Context.SetLabel("response_transactions_count", len(transactions))
+		}
+
 		c.JSON(http.StatusOK, response)
 	}
 }
@@ -303,21 +369,31 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 // Health check handler
 func healthHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+		span, ctx := apm.StartSpan(ctx, "health_check", "app")
+		defer span.End()
+
 		// Check database connection
-		err := db.Ping()
+		err := db.PingContext(ctx)
 		dbHealthy := err == nil
 
 		health := gin.H{
 			"status":    "healthy",
+			"service":   "accounts-go-service",
 			"database":  dbHealthy,
 			"timestamp": time.Now().UTC(),
 		}
 
+		span.Context.SetLabel("db_healthy", dbHealthy)
+
 		if !dbHealthy {
 			health["status"] = "unhealthy"
 			health["error"] = err.Error()
+			span.Context.SetLabel("health_result", "unhealthy")
+			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusServiceUnavailable, health)
 		} else {
+			span.Context.SetLabel("health_result", "healthy")
 			c.JSON(http.StatusOK, health)
 		}
 	}
@@ -325,6 +401,16 @@ func healthHandler(db *sql.DB) gin.HandlerFunc {
 
 func main() {
 	config := loadConfig()
+
+	// Initialize APM
+	log.Printf("Initializing APM with server URL: %s", config.APMServerURL)
+	log.Printf("APM Service Name: %s", config.APMServiceName)
+
+	// Set APM environment variables
+	os.Setenv("ELASTIC_APM_SERVER_URL", config.APMServerURL)
+	os.Setenv("ELASTIC_APM_SERVICE_NAME", config.APMServiceName)
+	os.Setenv("ELASTIC_APM_ENVIRONMENT", getEnv("ELASTIC_APM_ENVIRONMENT", "production"))
+	os.Setenv("ELASTIC_APM_SERVICE_VERSION", getEnv("ELASTIC_APM_SERVICE_VERSION", "1.0.0"))
 
 	// Connect to database
 	db, err := connectDB(config.DBConfig)
@@ -339,6 +425,9 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
+
+	// Add APM middleware
+	r.Use(apmgin.Middleware(r))
 
 	// Add CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -367,6 +456,7 @@ func main() {
 	port := config.Port
 	log.Printf("Starting VuBank Accounts Service on port %s", port)
 	log.Printf("Database: %s:%s/%s", config.DBConfig.Host, config.DBConfig.Port, config.DBConfig.DBName)
+	log.Printf("APM Server: %s", config.APMServerURL)
 
 	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)

@@ -22,26 +22,66 @@
             logLevel: 'info'
         });
         
-        // Set user context for authenticated user
-        const userData = JSON.parse(localStorage.getItem('vubank_user') || '{}');
-        if (userData.id) {
-            elasticApm.setUserContext({
-                id: userData.id,
-                username: userData.username,
-                email: `${userData.username}@vubank.com`
-            });
+        // Enhanced authentication validation function for fund transfer page
+        async function validateAuthenticationOnLoad() {
+            const token = localStorage.getItem('vubank_token');
+            const userStr = localStorage.getItem('vubank_user');
+            
+            // Basic checks first
+            if (!token || !userStr) {
+                console.warn('No authentication token or user data found, redirecting to login');
+                elasticApm.addLabels({ auth_failure_reason: 'missing_credentials' });
+                window.location.href = 'login.html';
+                return false;
+            }
+            
+            try {
+                // Parse and validate user data
+                const userData = JSON.parse(userStr);
+                if (!userData.id || !userData.username) {
+                    throw new Error('Invalid user data structure');
+                }
+                
+                // Set user context for RUM
+                elasticApm.setUserContext({
+                    id: userData.id,
+                    username: userData.username,
+                    email: `${userData.username}@vubank.com`
+                });
+                
+                elasticApm.addLabels({
+                    page: 'fund-transfer',
+                    component: 'transaction-flow',
+                    version: '1.0.0',
+                    user_roles: userData.roles ? userData.roles.join(',') : 'unknown',
+                    auth_validation: 'success'
+                });
+                
+                return true;
+                
+            } catch (error) {
+                console.error('Authentication validation failed:', error);
+                elasticApm.addLabels({ auth_failure_reason: 'invalid_user_data' });
+                elasticApm.captureError(error);
+                
+                // Clear invalid data and redirect
+                localStorage.removeItem('vubank_token');
+                localStorage.removeItem('vubank_user');
+                window.location.href = 'login.html';
+                return false;
+            }
         }
         
-        elasticApm.addLabels({
-            page: 'fund-transfer',
-            component: 'transaction-flow',
-            version: '1.0.0',
-            user_roles: userData.roles ? userData.roles.join(',') : 'unknown'
-        });
-        
-        // Track page load performance
-        window.addEventListener('load', function() {
-            elasticApm.startTransaction('fund-transfer-ready', 'page-load');
+        // Immediately validate authentication on page load
+        validateAuthenticationOnLoad().then(isValid => {
+            if (!isValid) {
+                return; // Already redirected to login
+            }
+            
+            // Track page load performance
+            window.addEventListener('load', function() {
+                elasticApm.startTransaction('fund-transfer-ready', 'page-load');
+            });
         });
     </script>
     <style>
@@ -1489,7 +1529,7 @@
 
             async loadPayeesFromAPI() {
                 try {
-                    const token = localStorage.getItem('token');
+                    const token = localStorage.getItem('vubank_token');
                     if (!token) {
                         console.warn('No authentication token found');
                         this.payees = [];
@@ -1626,9 +1666,9 @@
                         
                         try {
                             // Call backend logout API to terminate sessions
-                            const apiUrl = 'http://localhost:5001'; // Login service URL
+                            const apiUrl = 'http://localhost:8000'; // Go Login Gateway Service URL
                             
-                            const response = await fetch(`${apiUrl}/v1/logout`, {
+                            const response = await fetch(`${apiUrl}/api/logout`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',

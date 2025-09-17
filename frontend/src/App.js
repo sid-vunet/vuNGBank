@@ -30,9 +30,9 @@ function App() {
         
         try {
           // Call backend logout API to terminate sessions
-          const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+          const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
           
-          const response = await fetch(`${apiUrl}/v1/logout`, {
+          const response = await fetch(`${apiUrl}/api/logout`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

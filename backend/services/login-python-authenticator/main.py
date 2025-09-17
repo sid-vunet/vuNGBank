@@ -12,6 +12,9 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+# Startup cleanup flag
+_startup_cleanup_done = False
+
 # Elastic APM imports
 import elasticapm
 from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
@@ -47,6 +50,101 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add startup event handler - MUST be after app creation but before route definitions
+@app.on_event("startup")
+async def startup_event():
+    """Handle application startup tasks"""
+    print("🚀 STARTUP EVENT TRIGGERED - VuBank Authentication Service starting up...")
+    logger.info("🚀 STARTUP EVENT TRIGGERED - VuBank Authentication Service starting up...")
+    
+    try:
+        # Call the session cleanup function
+        print("🧹 Executing session cleanup...")
+        logger.info("🧹 Executing session cleanup...")
+        cleanup_sessions_on_startup()
+        print("✅ Session cleanup completed successfully")
+        logger.info("✅ VuBank Authentication Service startup completed successfully")
+    except Exception as e:
+        error_msg = f"❌ Error during startup: {e}"
+        print(error_msg)
+        logger.error(error_msg)
+        # Don't raise the exception to prevent startup failure
+        try:
+            elasticapm.capture_exception()
+        except Exception:
+            pass
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Handle application shutdown tasks"""
+    print("🛑 VuBank Authentication Service shutting down...")
+    logger.info("🛑 VuBank Authentication Service shutting down...")
+
+# Session cleanup function
+def cleanup_sessions_on_startup():
+    """
+    Mark all active sessions as terminated when service starts
+    This ensures clean session state after service restarts
+    """
+    print("🧹 Starting session cleanup process...")
+    logger.info("🧹 Starting session cleanup process...")
+    conn = None
+    try:
+        conn = get_db_connection()
+        print("📊 Database connection established for session cleanup")
+        logger.info("📊 Database connection established for session cleanup")
+        
+        with conn.cursor() as cursor:
+            # Mark all active sessions as terminated due to service restart
+            cursor.execute("""
+                UPDATE active_sessions 
+                SET is_active = FALSE, 
+                    terminated_reason = %s, 
+                    terminated_at = NOW()
+                WHERE is_active = TRUE
+            """, ("service_restart",))
+            
+            affected_rows = cursor.rowcount
+            conn.commit()
+            
+            success_msg = f"✅ Session cleanup on startup: Terminated {affected_rows} active sessions due to service restart"
+            print(success_msg)
+            logger.info(success_msg)
+            
+            # Add APM event for session cleanup
+            try:
+                elasticapm.capture_message(
+                    f"Service startup session cleanup: {affected_rows} sessions terminated",
+                    level="info",
+                    custom={"terminated_sessions": affected_rows, "reason": "service_restart"}
+                )
+            except Exception as apm_error:
+                print(f"⚠️ APM logging failed: {apm_error}")
+            
+    except Exception as e:
+        error_msg = f"❌ Error during session cleanup on startup: {e}"
+        print(error_msg)
+        logger.error(error_msg)
+        try:
+            elasticapm.capture_exception()
+        except Exception as apm_error:
+            print(f"⚠️ APM exception capture failed: {apm_error}")
+        try:
+            if conn:
+                conn.rollback()
+        except Exception as rollback_error:
+            print(f"❌ Error during rollback: {rollback_error}")
+            logger.error(f"❌ Error during rollback: {rollback_error}")
+    finally:
+        try:
+            if conn:
+                conn.close()
+                print("📊 Database connection closed after session cleanup")
+                logger.info("📊 Database connection closed after session cleanup")
+        except Exception as close_error:
+            print(f"❌ Error closing database connection: {close_error}")
+            logger.error(f"❌ Error closing database connection: {close_error}")
 
 # Pydantic models
 class LoginRequest(BaseModel):
@@ -214,8 +312,26 @@ def log_auth_attempt(user_id: Optional[int], username: str, success: bool,
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with startup cleanup"""
+    global _startup_cleanup_done
+    
     try:
+        # Perform startup cleanup on first health check call
+        if not _startup_cleanup_done:
+            print("🚀 First health check - performing startup session cleanup...")
+            logger.info("🚀 First health check - performing startup session cleanup...")
+            try:
+                cleanup_sessions_on_startup()
+                _startup_cleanup_done = True
+                print("✅ Startup cleanup completed on first health check")
+                logger.info("✅ Startup cleanup completed on first health check")
+            except Exception as cleanup_error:
+                error_msg = f"❌ Startup cleanup failed on health check: {cleanup_error}"
+                print(error_msg)
+                logger.error(error_msg)
+                # Don't fail health check due to cleanup failure, but retry next time
+        
+        # Regular health check
         with elasticapm.capture_span('database_health_check'):
             conn = get_db_connection()
             with conn.cursor() as cursor:
@@ -223,8 +339,16 @@ async def health_check():
                 cursor.fetchone()
             conn.close()
         
-        elasticapm.label(health_status="healthy", database_status="connected")
-        return {"status": "healthy", "database": "connected"}
+        elasticapm.label(
+            health_status="healthy", 
+            database_status="connected",
+            startup_cleanup_done=_startup_cleanup_done
+        )
+        return {
+            "status": "healthy", 
+            "database": "connected",
+            "startup_cleanup_done": _startup_cleanup_done
+        }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         elasticapm.label(health_status="unhealthy", database_status="disconnected")
@@ -460,5 +584,15 @@ async def logout_user(request: LogoutRequest):
 
 if __name__ == "__main__":
     import uvicorn
+    
+    # Perform session cleanup before starting the server
+    logger.info("🚀 VuBank Authentication Service starting up...")
+    try:
+        cleanup_sessions_on_startup()
+        logger.info("✅ Session cleanup completed, starting server...")
+    except Exception as e:
+        logger.error(f"❌ Error during session cleanup: {e}")
+        # Continue starting the server anyway
+    
     port = int(os.getenv('PUBLIC_API_PORT', '8001'))
     uvicorn.run(app, host="0.0.0.0", port=port)
