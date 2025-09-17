@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VuBank - Dashboard</title>
+    
+    <!-- Preconnect to Google Fonts for better performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Dashboard Styles */
+        .dashboard {
+            min-height: 100vh;
+            background: #f8fafc;
+        }
+
+        .dashboard-header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 64px;
+        }
+
+        .dashboard-nav {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-icon {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.7));
+            border-radius: 6px;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FF6B35;
+            font-weight: bold;
+            font-size: 12px;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.15);
+        }
+
+        .logo-text {
+            font-size: 16px;
+            font-weight: 400;
+            color: #003d82;
+            text-transform: lowercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dashboard-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1f2937;
+        }
+
+        .user-details {
+            color: #6b7280;
+            font-size: 12px;
+        }
+
+        .logout-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .dashboard-content {
+            padding: 24px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .dashboard-card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+        }
+
+        .dashboard-card:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .card-subtitle {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .card-amount {
+            font-size: 24px;
+            font-weight: 700;
+            color: #059669;
+            margin-bottom: 8px;
+        }
+
+        .quick-actions {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .action-btn {
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .action-btn.primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .action-btn.primary:hover {
+            background: #2563eb;
+        }
+
+        .action-btn.success {
+            background: #10b981;
+            color: white;
+        }
+
+        .action-btn.success:hover {
+            background: #059669;
+        }
+
+        .action-btn.purple {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .action-btn.purple:hover {
+            background: #7c3aed;
+        }
+
+        .action-btn.secondary {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            color: #374151;
+        }
+
+        .action-btn.secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .transaction-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-details h4 {
+            color: #1f2937;
+            font-size: 14px;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .transaction-details p {
+            color: #6b7280;
+            font-size: 12px;
+        }
+
+        .transaction-amount {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .transaction-amount.credit {
+            color: #059669;
+        }
+
+        .transaction-amount.debit {
+            color: #dc2626;
+        }
+
+        .loading-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-size: 18px;
+        }
+
+        .error-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            gap: 20px;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 18px;
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .retry-btn {
+            padding: 10px 20px;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .retry-btn:hover {
+            background-color: #1565c0;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .dashboard-header {
+                padding: 0 16px;
+                flex-wrap: wrap;
+                height: auto;
+                min-height: 64px;
+            }
+            
+            .dashboard-nav {
+                gap: 16px;
+            }
+            
+            .dashboard-content {
+                padding: 16px;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            .dashboard-card {
+                padding: 16px;
+            }
+            
+            .user-details {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="dashboard-header">
+            <div class="dashboard-nav">
+                <div class="logo">
+                    <div class="logo-icon">VU</div>
+                    <div class="logo-text">vubank</div>
+                </div>
+                <nav>
+                    <span style="color: #6b7280; margin-left: 32px;">
+                        VuBank Straight2Bank Dashboard
+                    </span>
+                </nav>
+            </div>
+            
+            <div class="dashboard-user">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <div class="user-info">
+                    <div class="user-name" id="userName">User</div>
+                    <div class="user-details" id="userDetails">ID: - | Roles: -</div>
+                </div>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <main id="dashboardContent" class="dashboard-content">
+            <!-- Loading state -->
+            <div id="loadingState" class="loading-container">
+                Loading your account data...
+            </div>
+
+            <!-- Error state -->
+            <div id="errorState" class="error-container" style="display: none;">
+                <div class="error-message" id="errorMessage">
+                    Error loading dashboard
+                </div>
+                <button id="retryBtn" class="retry-btn">Retry</button>
+            </div>
+
+            <!-- Main dashboard content -->
+            <div id="mainContent" style="display: none;">
+                <!-- Account Balance Cards -->
+                <div id="accountsGrid" class="dashboard-grid">
+                    <!-- Accounts will be populated here -->
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="dashboard-card">
+                    <h3 class="card-title">Recent Transactions</h3>
+                    <div id="transactionsList" class="transaction-list">
+                        <!-- Transactions will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Services Grid -->
+                <div class="dashboard-grid" style="margin-top: 24px;">
+                    <div class="dashboard-card">
+                        <h3 class="card-title">Trade Services</h3>
+                        <div class="card-subtitle" style="margin-top: 8px;">
+                            Letters of Credit, Trade Finance, Documentary Collections
+                        </div>
+                        <button class="action-btn secondary" style="margin-top: 16px;">
+                            View Services
+                        </button>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <h3 class="card-title">Cash Management</h3>
+                        <div class="card-subtitle" style="margin-top: 8px;">
+                            Account Services, Payments, Collections
+                        </div>
+                        <button class="action-btn secondary" style="margin-top: 16px;">
+                            Manage Cash
+                        </button>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <h3 class="card-title">Support Centre</h3>
+                        <div class="card-subtitle" style="margin-top: 8px;">
+                            Help, FAQs, Contact Support
+                        </div>
+                        <button class="action-btn secondary" style="margin-top: 16px;" 
+                                onclick="window.open('https://vunetsystems.com/contact-us/', '_blank')"
+                                onkeypress="if(event.key==='Enter'||event.key===' ') window.open('https://vunetsystems.com/contact-us/', '_blank')"
+                                aria-label="Contact VuNet Systems Support">
+                            Get Help
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Dashboard functionality
+        class DashboardManager {
+            constructor() {
+                this.user = null;
+                this.accounts = [];
+                this.transactions = [];
+                
+                this.initializeElements();
+                this.initializeEventListeners();
+                this.checkAuthentication();
+            }
+            
+            initializeElements() {
+                this.userAvatar = document.getElementById('userAvatar');
+                this.userName = document.getElementById('userName');
+                this.userDetails = document.getElementById('userDetails');
+                this.logoutBtn = document.getElementById('logoutBtn');
+                this.loadingState = document.getElementById('loadingState');
+                this.errorState = document.getElementById('errorState');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.retryBtn = document.getElementById('retryBtn');
+                this.mainContent = document.getElementById('mainContent');
+                this.accountsGrid = document.getElementById('accountsGrid');
+                this.transactionsList = document.getElementById('transactionsList');
+            }
+            
+            initializeEventListeners() {
+                this.logoutBtn.addEventListener('click', () => this.handleLogout());
+                this.retryBtn.addEventListener('click', () => this.loadDashboardData());
+            }
+            
+            checkAuthentication() {
+                const token = localStorage.getItem('vubank_token');
+                const userStr = localStorage.getItem('vubank_user');
+                
+                if (!token || !userStr) {
+                    // User not authenticated, redirect to login
+                    window.location.href = 'login.html';
+                    return;
+                }
+                
+                try {
+                    this.user = JSON.parse(userStr);
+                    this.updateUserInfo();
+                    this.loadDashboardData();
+                } catch (error) {
+                    console.error('Error parsing user data:', error);
+                    this.handleLogout();
+                }
+            }
+            
+            updateUserInfo() {
+                if (this.user) {
+                    this.userAvatar.textContent = this.user.username.charAt(0).toUpperCase();
+                    this.userName.textContent = this.user.username;
+                    this.userDetails.textContent = `ID: ${this.user.id} | Roles: ${this.user.roles?.join(', ') || 'N/A'}`;
+                }
+            }
+            
+            async loadDashboardData() {
+                this.showLoading();
+                
+                try {
+                    const token = localStorage.getItem('vubank_token');
+                    const apiUrl = 'http://localhost:8002'; // Accounts service
+                    
+                    const response = await fetch(`${apiUrl}/internal/accounts`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                            'Origin': window.location.origin,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-Api-Client': 'web-portal'
+                        }
+                    });
+                    
+                    if (response.status === 401) {
+                        // Token expired or invalid
+                        this.handleLogout();
+                        return;
+                    }
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Failed to fetch account data');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Transform and store data
+                    this.accounts = data.accounts.map(account => ({
+                        id: account.id,
+                        name: account.accountName,
+                        number: `****${account.accountNumber.slice(-4)}`,
+                        balance: account.balance,
+                        currency: account.currency,
+                        type: account.accountType
+                    }));
+                    
+                    this.transactions = data.recentTransactions.map(transaction => ({
+                        id: transaction.id,
+                        description: transaction.description,
+                        date: new Date(transaction.transactionDate).toLocaleDateString(),
+                        amount: transaction.transactionType === 'credit' 
+                            ? Math.abs(transaction.amount) 
+                            : -Math.abs(transaction.amount),
+                        type: transaction.transactionType,
+                        reference: transaction.referenceNumber
+                    }));
+                    
+                    this.renderDashboard();
+                    
+                } catch (error) {
+                    console.error('Error loading dashboard data:', error);
+                    this.showError(error.message || 'Unable to connect to accounts service');
+                }
+            }
+            
+            renderDashboard() {
+                this.renderAccounts();
+                this.renderTransactions();
+                this.showMainContent();
+            }
+            
+            renderAccounts() {
+                // Clear existing accounts
+                this.accountsGrid.innerHTML = '';
+                
+                // Add account cards
+                this.accounts.forEach(account => {
+                    const accountCard = document.createElement('div');
+                    accountCard.className = 'dashboard-card';
+                    accountCard.innerHTML = `
+                        <div class="card-header">
+                            <h3 class="card-title">${account.name}</h3>
+                            <span style="color: #6b7280; font-size: 14px;">
+                                ${account.number}
+                            </span>
+                        </div>
+                        <div class="card-amount">
+                            ${this.formatCurrency(account.balance, account.currency)}
+                        </div>
+                        <div class="card-subtitle">Available Balance</div>
+                    `;
+                    this.accountsGrid.appendChild(accountCard);
+                });
+                
+                // Add quick actions card
+                const quickActionsCard = document.createElement('div');
+                quickActionsCard.className = 'dashboard-card';
+                quickActionsCard.innerHTML = `
+                    <h3 class="card-title">Quick Actions</h3>
+                    <div class="quick-actions">
+                        <button class="action-btn primary">Transfer Money</button>
+                        <button class="action-btn success">Pay Bills</button>
+                        <button class="action-btn purple">View Statements</button>
+                    </div>
+                `;
+                this.accountsGrid.appendChild(quickActionsCard);
+            }
+            
+            renderTransactions() {
+                this.transactionsList.innerHTML = '';
+                
+                if (this.transactions.length === 0) {
+                    this.transactionsList.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No recent transactions found.</p>';
+                    return;
+                }
+                
+                this.transactions.forEach(transaction => {
+                    const transactionItem = document.createElement('div');
+                    transactionItem.className = 'transaction-item';
+                    transactionItem.innerHTML = `
+                        <div class="transaction-details">
+                            <h4>${transaction.description}</h4>
+                            <p>${transaction.date}</p>
+                        </div>
+                        <div class="transaction-amount ${transaction.type}">
+                            ${transaction.type === 'credit' ? '+' : ''}${this.formatCurrency(Math.abs(transaction.amount))}
+                        </div>
+                    `;
+                    this.transactionsList.appendChild(transactionItem);
+                });
+            }
+            
+            formatCurrency(amount, currency = 'USD') {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: currency
+                }).format(amount);
+            }
+            
+            showLoading() {
+                this.loadingState.style.display = 'flex';
+                this.errorState.style.display = 'none';
+                this.mainContent.style.display = 'none';
+            }
+            
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.loadingState.style.display = 'none';
+                this.errorState.style.display = 'flex';
+                this.mainContent.style.display = 'none';
+            }
+            
+            showMainContent() {
+                this.loadingState.style.display = 'none';
+                this.errorState.style.display = 'none';
+                this.mainContent.style.display = 'block';
+            }
+            
+            handleLogout() {
+                // Clear stored authentication data
+                localStorage.removeItem('vubank_token');
+                localStorage.removeItem('vubank_user');
+                
+                // Redirect to login page
+                window.location.href = 'login.html';
+            }
+        }
+        
+        // Initialize dashboard manager when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            const dashboardManager = new DashboardManager();
+            
+            // Make it available globally for debugging
+            window.dashboardManager = dashboardManager;
+        });
+    </script>
+</body>
+</html>
