@@ -8,8 +8,20 @@ A full-stack banking simulation platform that mimics VuBank's Straight2Bank inte
 vuNGBank/
 ├── frontend/          # React-based frontend application
 ├── backend/           # Node.js/Express API server
+├── docs/              # Comprehensive project documentation
 └── .github/          # GitHub configuration
 ```
+
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](./docs/) folder:
+
+- **[🏗️ Architecture](./docs/ARCHITECTURE.md)** - System architecture, components, and high-level design
+- **[🔧 API Reference](./docs/API.md)** - Complete REST API documentation with examples
+- **[🗄️ Database Schema](./docs/DATABASE.md)** - Database design, tables, indexes, and queries
+- **[⚙️ Technical Decisions](./docs/DECISIONS.md)** - Architectural decisions and trade-offs
+- **[📋 Coding Style Guide](./docs/STYLE.md)** - Coding standards and best practices
+- **[🔄 Data Flows](./docs/FLOW.md)** - User journeys and system data flows
 
 ## Features
 
