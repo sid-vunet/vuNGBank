@@ -565,7 +565,7 @@
                 this.accountsGrid.innerHTML = '';
                 
                 // Add account cards
-                this.accounts.forEach(account => {
+                this.accounts.forEach((account, index) => {
                     const accountCard = document.createElement('div');
                     accountCard.className = 'dashboard-card';
                     accountCard.innerHTML = `
@@ -576,7 +576,20 @@
                             </span>
                         </div>
                         <div class="card-amount">
-                            ${this.formatCurrency(account.balance, account.currency)}
+                            <div id="hiddenBalance-${index}" class="hidden-balance" style="display: block;">
+                                <span class="balance-dots">••••••</span>
+                                <button class="show-balance-btn" onclick="dashboardManager.showBalance(${index})" 
+                                        id="showBtn-${index}">
+                                    👁️ Show Balance
+                                </button>
+                            </div>
+                            <div id="actualBalance-${index}" class="actual-balance" style="display: none;">
+                                <span id="balanceAmount-${index}">${this.formatCurrency(account.balance, account.currency)}</span>
+                                <button class="hide-balance-btn" onclick="dashboardManager.hideBalance(${index})" 
+                                        id="hideBtn-${index}">
+                                    🙈 Hide Balance
+                                </button>
+                            </div>
                         </div>
                         <div class="card-subtitle">Available Balance</div>
                     `;
