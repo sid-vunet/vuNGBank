@@ -1115,6 +1115,7 @@
                 this.transferAmount = 0;
                 this.transferNote = '';
                 this.userAccounts = [];
+                this.user = null;
                 this.payees = [];
                 this.transactionId = null;
                 
@@ -1225,6 +1226,10 @@
                 }
 
                 try {
+                    // Parse and update user information
+                    this.user = JSON.parse(userStr);
+                    this.updateUserInfo();
+
                     // Load account data from accounts service directly
                     const apiUrl = 'http://localhost:8002'; // Accounts service
                     const response = await fetch(`${apiUrl}/internal/accounts`, {
@@ -1273,6 +1278,16 @@
                     }
                 } catch (error) {
                     console.error('Error loading user data:', error);
+                }
+            }
+
+            updateUserInfo() {
+                if (this.user) {
+                    this.userAvatar.textContent = this.user.username.charAt(0).toUpperCase();
+                    this.userName.textContent = this.user.username;
+                    if (this.userDetails) {
+                        this.userDetails.textContent = `ID: ${this.user.id} | Roles: ${this.user.roles?.join(', ') || 'N/A'}`;
+                    }
                 }
             }
 
@@ -1382,21 +1397,20 @@
             }
 
             toggleUserDropdown() {
-                const isVisible = this.userDropdown.style.display === 'block';
-                this.userDropdown.style.display = isVisible ? 'none' : 'block';
+                this.userDropdown.classList.toggle('show');
             }
 
             hideUserDropdown() {
-                this.userDropdown.style.display = 'none';
+                this.userDropdown.classList.remove('show');
             }
 
             showLogoutModal() {
                 this.hideUserDropdown();
-                this.logoutModal.style.display = 'flex';
+                this.logoutModal.classList.add('show');
             }
 
             hideLogoutModal() {
-                this.logoutModal.style.display = 'none';
+                this.logoutModal.classList.remove('show');
             }
 
             handleLogout() {
