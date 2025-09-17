@@ -31,7 +31,23 @@ namespace PayeeService.Models.DTOs
         public string BankName { get; set; } = string.Empty;
         public string BranchName { get; set; } = string.Empty;
         public string AccountType { get; set; } = string.Empty;
+        
+        // Enhanced fields from Razorpay IFSC API
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? BranchAddress { get; set; }
+        public string? ContactNumber { get; set; }
+        public string? MicrCode { get; set; }
+        public string? BankCode { get; set; }
+        
+        // Payment method support flags
+        public bool RtgsEnabled { get; set; }
+        public bool NeftEnabled { get; set; }
+        public bool ImpsEnabled { get; set; }
+        public bool UpiEnabled { get; set; }
+        
         public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 
     public class CheckPayeeExistsRequest
@@ -62,6 +78,14 @@ namespace PayeeService.Models.DTOs
         public string? BranchName { get; set; }
         public string? City { get; set; }
         public string? State { get; set; }
+        public string? Address { get; set; }
+        public string? Contact { get; set; }
+        public string? MicrCode { get; set; }
+        public string? BankCode { get; set; }
+        public bool? UpiSupported { get; set; }
+        public bool? RtgsSupported { get; set; }
+        public bool? NeftSupported { get; set; }
+        public bool? ImpsSupported { get; set; }
         public string? ErrorMessage { get; set; }
     }
 

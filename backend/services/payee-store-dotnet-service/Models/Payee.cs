@@ -45,7 +45,47 @@ namespace PayeeService.Models
         [Column("account_type")]
         public string AccountType { get; set; } = "Savings";
 
+        // Enhanced fields from Razorpay IFSC API
+        [StringLength(50)]
+        [Column("city")]
+        public string? City { get; set; }
+
+        [StringLength(50)]
+        [Column("state")]
+        public string? State { get; set; }
+
+        [Column("branch_address")]
+        public string? BranchAddress { get; set; }
+
+        [StringLength(20)]
+        [Column("contact_number")]
+        public string? ContactNumber { get; set; }
+
+        [StringLength(20)]
+        [Column("micr_code")]
+        public string? MicrCode { get; set; }
+
+        [StringLength(10)]
+        [Column("bank_code")]
+        public string? BankCode { get; set; }
+
+        // Payment method support flags
+        [Column("rtgs_enabled")]
+        public bool RtgsEnabled { get; set; } = true;
+
+        [Column("neft_enabled")]
+        public bool NeftEnabled { get; set; } = true;
+
+        [Column("imps_enabled")]
+        public bool ImpsEnabled { get; set; } = true;
+
+        [Column("upi_enabled")]
+        public bool UpiEnabled { get; set; } = true;
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [Column("updated_at")]
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 }

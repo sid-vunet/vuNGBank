@@ -45,7 +45,18 @@ namespace PayeeService.Services
                     BankName = p.BankName,
                     BranchName = p.BranchName,
                     AccountType = p.AccountType,
-                    CreatedAt = p.CreatedAt
+                    City = p.City,
+                    State = p.State,
+                    BranchAddress = p.BranchAddress,
+                    ContactNumber = p.ContactNumber,
+                    MicrCode = p.MicrCode,
+                    BankCode = p.BankCode,
+                    RtgsEnabled = p.RtgsEnabled,
+                    NeftEnabled = p.NeftEnabled,
+                    ImpsEnabled = p.ImpsEnabled,
+                    UpiEnabled = p.UpiEnabled,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt
                 });
             }
             catch (Exception ex)
@@ -74,7 +85,18 @@ namespace PayeeService.Services
                     BankName = payee.BankName,
                     BranchName = payee.BranchName,
                     AccountType = payee.AccountType,
-                    CreatedAt = payee.CreatedAt
+                    City = payee.City,
+                    State = payee.State,
+                    BranchAddress = payee.BranchAddress,
+                    ContactNumber = payee.ContactNumber,
+                    MicrCode = payee.MicrCode,
+                    BankCode = payee.BankCode,
+                    RtgsEnabled = payee.RtgsEnabled,
+                    NeftEnabled = payee.NeftEnabled,
+                    ImpsEnabled = payee.ImpsEnabled,
+                    UpiEnabled = payee.UpiEnabled,
+                    CreatedAt = payee.CreatedAt,
+                    UpdatedAt = payee.UpdatedAt
                 };
             }
             catch (Exception ex)
@@ -106,7 +128,7 @@ namespace PayeeService.Services
                     throw new ArgumentException($"Invalid IFSC code: {ifscValidation.ErrorMessage}");
                 }
 
-                // Create new payee
+                // Create new payee with enhanced fields from IFSC validation
                 var payee = new Payee
                 {
                     UserId = userId,
@@ -116,7 +138,18 @@ namespace PayeeService.Services
                     BankName = ifscValidation.BankName!,
                     BranchName = ifscValidation.BranchName!,
                     AccountType = request.AccountType,
-                    CreatedAt = DateTime.UtcNow
+                    City = ifscValidation.City,
+                    State = ifscValidation.State,
+                    BranchAddress = ifscValidation.Address,
+                    ContactNumber = ifscValidation.Contact,
+                    MicrCode = ifscValidation.MicrCode,
+                    BankCode = ifscValidation.BankCode,
+                    RtgsEnabled = ifscValidation.RtgsSupported ?? true,
+                    NeftEnabled = ifscValidation.NeftSupported ?? true,
+                    ImpsEnabled = ifscValidation.ImpsSupported ?? true,
+                    UpiEnabled = ifscValidation.UpiSupported ?? true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
 
                 _context.Payees.Add(payee);
@@ -133,7 +166,18 @@ namespace PayeeService.Services
                     BankName = payee.BankName,
                     BranchName = payee.BranchName,
                     AccountType = payee.AccountType,
-                    CreatedAt = payee.CreatedAt
+                    City = payee.City,
+                    State = payee.State,
+                    BranchAddress = payee.BranchAddress,
+                    ContactNumber = payee.ContactNumber,
+                    MicrCode = payee.MicrCode,
+                    BankCode = payee.BankCode,
+                    RtgsEnabled = payee.RtgsEnabled,
+                    NeftEnabled = payee.NeftEnabled,
+                    ImpsEnabled = payee.ImpsEnabled,
+                    UpiEnabled = payee.UpiEnabled,
+                    CreatedAt = payee.CreatedAt,
+                    UpdatedAt = payee.UpdatedAt
                 };
             }
             catch (Exception ex)

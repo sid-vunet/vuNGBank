@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -12,19 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
-	"go.elastic.co/apm/module/apmgin/v2"
-	"go.elastic.co/apm/module/apmsql/v2"
-	_ "go.elastic.co/apm/module/apmsql/v2/pq"
-	"go.elastic.co/apm/v2"
 )
 
 // Config struct
 type Config struct {
-	Port           string
-	JWTSecret      string
-	DBConfig       DBConfig
-	APMServerURL   string
-	APMServiceName string
+	Port      string
+	JWTSecret string
+	DBConfig  DBConfig
 }
 
 type DBConfig struct {
@@ -79,10 +72,8 @@ type Claims struct {
 // Load configuration
 func loadConfig() *Config {
 	return &Config{
-		Port:           getEnv("PUBLIC_API_PORT", "8002"),
-		JWTSecret:      getEnv("JWT_SECRET", "your-super-secret-jwt-key"),
-		APMServerURL:   getEnv("ELASTIC_APM_SERVER_URL", "http://91.203.133.240:30200"),
-		APMServiceName: getEnv("ELASTIC_APM_SERVICE_NAME", "accounts-go-service"),
+		Port:      getEnv("PUBLIC_API_PORT", "8002"),
+		JWTSecret: getEnv("JWT_SECRET", "your-super-secret-jwt-key"),
 		DBConfig: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
@@ -106,8 +97,7 @@ func connectDB(config DBConfig) (*sql.DB, error) {
 	connStr := "host=" + config.Host + " port=" + config.Port + " user=" + config.User +
 		" password=" + config.Password + " dbname=" + config.DBName + " sslmode=" + config.SSLMode
 
-	// Use APM instrumented SQL driver
-	db, err := apmsql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +134,11 @@ func jwtMiddleware(jwtSecret string) gin.HandlerFunc {
 		}
 
 		// Parse token
-		log.Printf("Parsing JWT token for validation")
 		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 			return []byte(jwtSecret), nil
 		})
 
 		if err != nil || !token.Valid {
-			log.Printf("JWT validation failed: err=%v, valid=%v", err, token != nil && token.Valid)
 			c.JSON(http.StatusUnauthorized, ErrorResponse{
 				Error:   "invalid_token",
 				Message: "Invalid or expired token",
@@ -161,7 +149,6 @@ func jwtMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		claims, ok := token.Claims.(*Claims)
 		if !ok {
-			log.Printf("Failed to parse token claims")
 			c.JSON(http.StatusUnauthorized, ErrorResponse{
 				Error:   "invalid_claims",
 				Message: "Invalid token claims",
@@ -169,8 +156,6 @@ func jwtMiddleware(jwtSecret string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
-		log.Printf("JWT claims parsed: UserID=%s, Roles=%v", claims.UserID, claims.Roles)
 
 		// Check roles
 		hasValidRole := false
@@ -197,13 +182,7 @@ func jwtMiddleware(jwtSecret string) gin.HandlerFunc {
 }
 
 // Get user accounts
-func getUserAccounts(ctx context.Context, db *sql.DB, userID string) ([]Account, error) {
-	span, ctx := apm.StartSpan(ctx, "database_accounts_lookup", "db.postgresql")
-	defer span.End()
-
-	span.Context.SetLabel("user_id", userID)
-	span.Context.SetLabel("operation", "get_accounts")
-
+func getUserAccounts(db *sql.DB, userID string) ([]Account, error) {
 	query := `
 		SELECT id, account_number, account_name, account_type, balance, currency, status
 		FROM accounts 
@@ -211,10 +190,8 @@ func getUserAccounts(ctx context.Context, db *sql.DB, userID string) ([]Account,
 		ORDER BY created_at DESC
 	`
 
-	rows, err := db.QueryContext(ctx, query, userID)
+	rows, err := db.Query(query, userID)
 	if err != nil {
-		span.Context.SetLabel("query_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 	defer rows.Close()
@@ -232,26 +209,16 @@ func getUserAccounts(ctx context.Context, db *sql.DB, userID string) ([]Account,
 			&account.Status,
 		)
 		if err != nil {
-			span.Context.SetLabel("scan_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			return nil, err
 		}
 		accounts = append(accounts, account)
 	}
 
-	span.Context.SetLabel("query_result", "success")
-	span.Context.SetLabel("accounts_count", len(accounts))
 	return accounts, nil
 }
 
 // Get recent transactions for user
-func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Transaction, error) {
-	span, ctx := apm.StartSpan(ctx, "database_transactions_lookup", "db.postgresql")
-	defer span.End()
-
-	span.Context.SetLabel("user_id", userID)
-	span.Context.SetLabel("operation", "get_recent_transactions")
-
+func getRecentTransactions(db *sql.DB, userID string) ([]Transaction, error) {
 	query := `
 		SELECT t.id, t.transaction_type, t.amount, t.description, 
 			   t.reference_number, t.transaction_date, t.balance_after, t.status
@@ -262,10 +229,8 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 		LIMIT 20
 	`
 
-	rows, err := db.QueryContext(ctx, query, userID)
+	rows, err := db.Query(query, userID)
 	if err != nil {
-		span.Context.SetLabel("query_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 	defer rows.Close()
@@ -286,8 +251,6 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 			&transaction.Status,
 		)
 		if err != nil {
-			span.Context.SetLabel("scan_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			return nil, err
 		}
 
@@ -295,8 +258,6 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 		transactions = append(transactions, transaction)
 	}
 
-	span.Context.SetLabel("query_result", "success")
-	span.Context.SetLabel("transactions_count", len(transactions))
 	return transactions, nil
 }
 
@@ -304,34 +265,13 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 func accountsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
-		rolesInterface, exists := c.Get("roles")
-		var roles []string
-		if exists {
-			if rolesSlice, ok := rolesInterface.([]string); ok {
-				roles = rolesSlice
-			}
-		}
-
-		// Create APM transaction
-		tx := apm.TransactionFromContext(c.Request.Context())
-		if tx != nil {
-			tx.Context.SetLabel("user_id", userID)
-			tx.Context.SetLabel("endpoint", "accounts")
-			tx.Context.SetLabel("user_roles", strings.Join(roles, ","))
-		}
 
 		log.Printf("Fetching accounts for user: %s", userID)
 
-		// Create span for business logic
-		span, ctx := apm.StartSpan(c.Request.Context(), "accounts_business_logic", "app")
-		defer span.End()
-
 		// Get user accounts
-		accounts, err := getUserAccounts(ctx, db, userID)
+		accounts, err := getUserAccounts(db, userID)
 		if err != nil {
 			log.Printf("Failed to get accounts: %v", err)
-			span.Context.SetLabel("accounts_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
 				Message: "Failed to retrieve accounts",
@@ -340,11 +280,9 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Get recent transactions
-		transactions, err := getRecentTransactions(ctx, db, userID)
+		transactions, err := getRecentTransactions(db, userID)
 		if err != nil {
 			log.Printf("Failed to get transactions: %v", err)
-			span.Context.SetLabel("transactions_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
 				Message: "Failed to retrieve transactions",
@@ -358,15 +296,6 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 			Transactions: transactions,
 		}
 
-		span.Context.SetLabel("accounts_result", "success")
-		span.Context.SetLabel("accounts_count", len(accounts))
-		span.Context.SetLabel("transactions_count", len(transactions))
-
-		if tx != nil {
-			tx.Context.SetLabel("response_accounts_count", len(accounts))
-			tx.Context.SetLabel("response_transactions_count", len(transactions))
-		}
-
 		c.JSON(http.StatusOK, response)
 	}
 }
@@ -374,31 +303,21 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 // Health check handler
 func healthHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
-		span, ctx := apm.StartSpan(ctx, "health_check", "app")
-		defer span.End()
-
 		// Check database connection
-		err := db.PingContext(ctx)
+		err := db.Ping()
 		dbHealthy := err == nil
 
 		health := gin.H{
 			"status":    "healthy",
-			"service":   "accounts-go-service",
 			"database":  dbHealthy,
 			"timestamp": time.Now().UTC(),
 		}
 
-		span.Context.SetLabel("db_healthy", dbHealthy)
-
 		if !dbHealthy {
 			health["status"] = "unhealthy"
 			health["error"] = err.Error()
-			span.Context.SetLabel("health_result", "unhealthy")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusServiceUnavailable, health)
 		} else {
-			span.Context.SetLabel("health_result", "healthy")
 			c.JSON(http.StatusOK, health)
 		}
 	}
@@ -406,16 +325,6 @@ func healthHandler(db *sql.DB) gin.HandlerFunc {
 
 func main() {
 	config := loadConfig()
-
-	// Initialize APM
-	log.Printf("Initializing APM with server URL: %s", config.APMServerURL)
-	log.Printf("APM Service Name: %s", config.APMServiceName)
-
-	// Set APM environment variables
-	os.Setenv("ELASTIC_APM_SERVER_URL", config.APMServerURL)
-	os.Setenv("ELASTIC_APM_SERVICE_NAME", config.APMServiceName)
-	os.Setenv("ELASTIC_APM_ENVIRONMENT", getEnv("ELASTIC_APM_ENVIRONMENT", "production"))
-	os.Setenv("ELASTIC_APM_SERVICE_VERSION", getEnv("ELASTIC_APM_SERVICE_VERSION", "1.0.0"))
 
 	// Connect to database
 	db, err := connectDB(config.DBConfig)
@@ -430,9 +339,6 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
-
-	// Add APM middleware
-	r.Use(apmgin.Middleware(r))
 
 	// Add CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -461,7 +367,6 @@ func main() {
 	port := config.Port
 	log.Printf("Starting VuBank Accounts Service on port %s", port)
 	log.Printf("Database: %s:%s/%s", config.DBConfig.Host, config.DBConfig.Port, config.DBConfig.DBName)
-	log.Printf("APM Server: %s", config.APMServerURL)
 
 	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)

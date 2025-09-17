@@ -1550,7 +1550,7 @@
 
                     const payeesData = await response.json();
                     
-                    // Transform API response to match frontend format
+                    // Transform API response to match frontend format with enhanced fields
                     this.payees = payeesData.map(payee => ({
                         id: payee.id,
                         name: payee.beneficiaryName,
@@ -1558,7 +1558,17 @@
                         bankName: payee.bankName,
                         branchName: payee.branchName,
                         ifscCode: payee.ifscCode,
-                        accountType: payee.accountType
+                        accountType: payee.accountType,
+                        city: payee.city,
+                        state: payee.state,
+                        branchAddress: payee.branchAddress,
+                        contactNumber: payee.contactNumber,
+                        micrCode: payee.micrCode,
+                        bankCode: payee.bankCode,
+                        rtgsEnabled: payee.rtgsEnabled,
+                        neftEnabled: payee.neftEnabled,
+                        impsEnabled: payee.impsEnabled,
+                        upiEnabled: payee.upiEnabled
                     }));
 
                     console.log(`Loaded ${this.payees.length} payees from API`);
@@ -1794,7 +1804,7 @@
 
             async addPayeeToAPI(payeeData) {
                 try {
-                    const token = localStorage.getItem('token');
+                    const token = localStorage.getItem('vubank_token');
                     if (!token) {
                         throw new Error('No authentication token found');
                     }
@@ -1853,7 +1863,7 @@
                     // Add payee via API
                     const newPayee = await this.addPayeeToAPI(payeeData);
                     
-                    // Add to local payees array
+                    // Add to local payees array with enhanced fields
                     this.payees.push({
                         id: newPayee.id,
                         name: newPayee.beneficiaryName,
@@ -1861,7 +1871,17 @@
                         bankName: newPayee.bankName,
                         branchName: newPayee.branchName,
                         ifscCode: newPayee.ifscCode,
-                        accountType: newPayee.accountType
+                        accountType: newPayee.accountType,
+                        city: newPayee.city,
+                        state: newPayee.state,
+                        branchAddress: newPayee.branchAddress,
+                        contactNumber: newPayee.contactNumber,
+                        micrCode: newPayee.micrCode,
+                        bankCode: newPayee.bankCode,
+                        rtgsEnabled: newPayee.rtgsEnabled,
+                        neftEnabled: newPayee.neftEnabled,
+                        impsEnabled: newPayee.impsEnabled,
+                        upiEnabled: newPayee.upiEnabled
                     });
                     
                     // Close modal and reset form

@@ -27,7 +27,13 @@
             // Additional configuration
             distributedTracingOrigins: ['http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 'http://localhost:8003', 'http://localhost:5004'],
             disableInstrumentations: [],
-            logLevel: 'info'
+            logLevel: 'debug',
+            // Enable distributed tracing
+            distributedTracing: true,
+            // Enable instrumentation for fetch
+            instrumentFetch: true,
+            // More verbose logging
+            active: true
         });
         
         // Set custom user context and labels for login page
@@ -798,13 +804,32 @@
                         force_login: forceLogin
                     });
                     
+                    // Get trace context for distributed tracing
+                    const traceHeaders = {};
+                    
+                    // Try to get trace context from active transaction
+                    try {
+                        const currentTransaction = elasticApm.getCurrentTransaction();
+                        if (currentTransaction && currentTransaction.traceId) {
+                            const traceId = currentTransaction.traceId;
+                            const spanId = apiSpan.id || '0000000000000000';
+                            const flags = '01'; // sampled
+                            traceHeaders['traceparent'] = `00-${traceId}-${spanId}-${flags}`;
+                            traceHeaders['tracestate'] = 'vubank=frontend-login';
+                            console.log('🔍 Adding manual trace headers:', traceHeaders);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to extract trace context:', e);
+                    }
+                    
                     const response = await fetch(`${apiUrl}/api/login`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Origin': window.location.origin,
                             'X-Requested-With': 'XMLHttpRequest',
-                            'X-Api-Client': 'web-portal'
+                            'X-Api-Client': 'web-portal',
+                            ...traceHeaders
                         },
                         body: JSON.stringify({
                             username: formData.get('username'),

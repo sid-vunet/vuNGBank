@@ -4,6 +4,7 @@ using PayeeService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Elastic.Apm.NetCoreAll;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Add Elastic APM
+builder.Services.AddAllElasticApm();
 
 // Database configuration
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -25,7 +29,9 @@ builder.Services.AddScoped<IIfscService, IfscService>();
 builder.Services.AddHttpClient<IIfscService, IfscService>();
 
 // JWT Authentication
-var jwtSecret = builder.Configuration["JWT_SECRET"] ?? "your-super-secret-jwt-key-for-vubank-application";
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? 
+                builder.Configuration["JWT_SECRET"] ?? 
+                "vubank-super-secret-jwt-key-2023";
 var key = Encoding.ASCII.GetBytes(jwtSecret);
 
 builder.Services.AddAuthentication(x =>
@@ -84,11 +90,23 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { 
-    status = "healthy",
-    service = "Payee Store Service",
-    version = "1.0.0",
-    timestamp = DateTime.UtcNow 
-}));
+app.MapGet("/health", () => {
+    var apmServerUrl = Environment.GetEnvironmentVariable("ELASTIC_APM_SERVER_URLS") ?? "not configured";
+    var serviceName = Environment.GetEnvironmentVariable("ELASTIC_APM_SERVICE_NAME") ?? "payee-store-service";
+    var environment = Environment.GetEnvironmentVariable("ELASTIC_APM_ENVIRONMENT") ?? "production";
+    
+    return Results.Ok(new { 
+        status = "healthy",
+        service = "Payee Store Service",
+        version = "1.0.0",
+        timestamp = DateTime.UtcNow,
+        apm = new {
+            enabled = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ELASTIC_APM_SERVER_URLS")),
+            serverUrl = apmServerUrl,
+            serviceName = serviceName,
+            environment = environment
+        }
+    });
+});
 
 app.Run();

@@ -42,7 +42,15 @@ namespace PayeeService.Services
                             BankName = bankDetails.Bank ?? "Unknown Bank",
                             BranchName = bankDetails.Branch ?? "Unknown Branch",
                             City = bankDetails.City ?? "Unknown City",
-                            State = bankDetails.State
+                            State = bankDetails.State,
+                            Address = bankDetails.Address,
+                            Contact = bankDetails.Contact,
+                            MicrCode = bankDetails.Micr,
+                            BankCode = bankDetails.BankCode,
+                            UpiSupported = bankDetails.Upi,
+                            RtgsSupported = bankDetails.Rtgs,
+                            NeftSupported = bankDetails.Neft,
+                            ImpsSupported = bankDetails.Imps
                         };
                     }
                 }
@@ -86,6 +94,12 @@ namespace PayeeService.Services
 
         [JsonPropertyName("CONTACT")]
         public string? Contact { get; set; }
+
+        [JsonPropertyName("MICR")]
+        public string? Micr { get; set; }
+
+        [JsonPropertyName("BANKCODE")]
+        public string? BankCode { get; set; }
 
         [JsonPropertyName("UPI")]
         public bool? Upi { get; set; }

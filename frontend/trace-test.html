@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trace Propagation Test</title>
+    
+    <!-- Elastic RUM Agent -->
+    <script src="https://unpkg.com/@elastic/apm-rum@5.12.0/dist/bundles/elastic-apm-rum.umd.min.js" crossorigin></script>
+    <script>
+        // Initialize Elastic RUM
+        const apm = elasticApm.init({
+            serviceName: 'vubank-frontend-test',
+            serverUrl: 'http://91.203.133.240:30200',
+            serviceVersion: '1.0.0',
+            environment: 'test',
+            distributedTracingOrigins: ['http://localhost:8000'],
+            distributedTracing: true,
+            instrumentFetch: true,
+            logLevel: 'debug',
+            active: true
+        });
+        
+        console.log('RUM Agent initialized:', apm);
+    </script>
+</head>
+<body>
+    <h1>Trace Propagation Test</h1>
+    <button onclick="testLogin()">Test Login with Trace Headers</button>
+    <div id="result"></div>
+    
+    <script>
+        async function testLogin() {
+            console.log('🚀 Starting trace propagation test...');
+            
+            // Start a RUM transaction
+            const transaction = elasticApm.startTransaction('test-login-trace', 'user-interaction');
+            transaction.addLabels({
+                test_type: 'trace_propagation',
+                timestamp: new Date().toISOString()
+            });
+            
+            try {
+                // Start span for API call
+                const span = transaction.startSpan('login-api-call', 'http');
+                span.addLabels({
+                    endpoint: '/api/login',
+                    method: 'POST'
+                });
+                
+                console.log('📋 Active transaction:', transaction);
+                console.log('📋 Current span:', span);
+                
+                // Method 1: Let RUM auto-instrument
+                console.log('🔄 Testing automatic instrumentation...');
+                const response1 = await fetch('http://localhost:8000/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Client': 'web-portal',
+                        'Origin': window.location.origin
+                    },
+                    body: JSON.stringify({
+                        username: 'johndoe',
+                        password: 'password123',
+                        force_login: true
+                    })
+                });
+                
+                span.end();
+                
+                // Method 2: Manual trace headers
+                console.log('🔄 Testing manual trace headers...');
+                const span2 = transaction.startSpan('login-api-call-manual', 'http');
+                
+                // Get current transaction trace ID manually
+                const traceId = transaction.traceId || 'unknown';
+                const spanId = span2.id || '0000000000000000';
+                const traceparent = `00-${traceId}-${spanId}-01`;
+                
+                console.log('🔍 Manual traceparent:', traceparent);
+                
+                const response2 = await fetch('http://localhost:8000/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Client': 'web-portal',
+                        'Origin': window.location.origin,
+                        'traceparent': traceparent,
+                        'tracestate': 'vubank=manual-test'
+                    },
+                    body: JSON.stringify({
+                        username: 'johndoe',
+                        password: 'password123',
+                        force_login: true
+                    })
+                });
+                
+                span2.end();
+                
+                document.getElementById('result').innerHTML = `
+                    <h3>Test Results:</h3>
+                    <p><strong>Auto-instrumentation:</strong> Status ${response1.status}</p>
+                    <p><strong>Manual headers:</strong> Status ${response2.status}</p>
+                    <p><strong>Transaction ID:</strong> ${traceId}</p>
+                    <p><strong>Check backend logs for trace headers!</strong></p>
+                `;
+                
+                transaction.addLabels({
+                    test_result: 'success',
+                    auto_status: response1.status,
+                    manual_status: response2.status
+                });
+                
+            } catch (error) {
+                console.error('❌ Test failed:', error);
+                transaction.addLabels({
+                    test_result: 'error',
+                    error_message: error.message
+                });
+                elasticApm.captureError(error);
+            } finally {
+                transaction.end();
+            }
+        }
+    </script>
+</body>
+</html>

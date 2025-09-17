@@ -119,6 +119,11 @@ services:
     container_name: pdf-receipt-java-service
     environment:
       SPRING_PROFILES_ACTIVE: production
+      ELASTIC_APM_SERVER_URLS: http://91.203.133.240:30200
+      ELASTIC_APM_SERVICE_NAME: vubank-pdf-service
+      ELASTIC_APM_ENVIRONMENT: production
+      ELASTIC_APM_SERVICE_VERSION: 1.0.0
+      ELASTIC_APM_APPLICATION_PACKAGES: com.vubank.pdf
     ports:
       - "8003:8003"
     networks:
@@ -139,6 +144,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__DefaultConnection: "Host=vubank-postgres;Port=5432;Database=vubank_db;Username=vubank_user;Password=vubank_pass;"
       JWT_SECRET: vubank-super-secret-jwt-key-2023
+      ELASTIC_APM_SERVER_URLS: http://91.203.133.240:30200
+      ELASTIC_APM_SERVICE_NAME: vubank-payee-service
+      ELASTIC_APM_ENVIRONMENT: production
+      ELASTIC_APM_SERVICE_VERSION: 1.0.0
+      ELASTIC_APM_APPLICATION_PACKAGES: PayeeService
     ports:
       - "5004:5004"
     depends_on:
