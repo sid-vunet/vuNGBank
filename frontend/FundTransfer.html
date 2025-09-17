@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VuBank - Fund Transfer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f9fafb;
+            min-height: 100vh;
+        }
+
+        .transfer-header {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .help-btn {
+            background: none;
+            border: 1px solid #e5e7eb;
+            padding: 8px 16px;
+            border-radius: 6px;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .help-btn:hover {
+            border-color: #d1d5db;
+            background: #f9fafb;
+        }
+
+        /* User info and dropdown styles */
+        .header-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: 24px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+        }
+
+        .user-avatar:hover {
+            background: #2563eb;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .user-info:hover .user-name {
+            color: #3b82f6;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1f2937;
+        }
+
+        .user-details {
+            color: #6b7280;
+            font-size: 12px;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 120px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-5px);
+            transition: all 0.2s ease-in-out;
+            margin-top: 8px;
+        }
+
+        .user-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            color: #374151;
+            text-decoration: none;
+            font-size: 14px;
+            border: none;
+            background: none;
+            width: 100%;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background-color: #f3f4f6;
+            color: #ef4444;
+        }
+
+        .dropdown-item svg {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+
+        /* Modal styles for logout confirmation */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: scale(0.9);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+
+        .modal-message {
+            color: #6b7280;
+            font-size: 16px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .modal-btn-primary {
+            background: #ef4444;
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background: #dc2626;
+        }
+
+        .modal-btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .modal-btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .transfer-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .progress-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 32px;
+        }
+
+        .progress-steps {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .step-circle.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .step-circle.completed {
+            background: #10b981;
+            color: white;
+        }
+
+        .step-circle.pending {
+            background: #f3f4f6;
+            color: #9ca3af;
+            border: 2px solid #e5e7eb;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: #6b7280;
+            white-space: nowrap;
+        }
+
+        .step-connector {
+            width: 40px;
+            height: 2px;
+            background: #e5e7eb;
+        }
+
+        .step-connector.completed {
+            background: #10b981;
+        }
+
+        .transfer-card {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+            background: white;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .payee-dropdown {
+            position: relative;
+        }
+
+        .payee-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none;
+        }
+
+        .payee-suggestions.show {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .suggestion-item:hover {
+            background: #f9fafb;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .add-payee-item {
+            background: #f0f9ff;
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        .add-payee-item:hover {
+            background: #dbeafe;
+        }
+
+        .account-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .account-option {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .account-option:hover {
+            border-color: #d1d5db;
+            background: #f9fafb;
+        }
+
+        .account-option.selected {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        /* Distinctive colors for account types */
+        .account-option.savings-account {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+
+        .account-option.savings-account:hover {
+            background: #dcfce7;
+            border-color: #86efac;
+        }
+
+        .account-option.savings-account.selected {
+            background: #ecfdf5;
+            border-color: #10b981;
+        }
+
+        .account-option.checking-account {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        .account-option.checking-account:hover {
+            background: #dbeafe;
+            border-color: #93c5fd;
+        }
+
+        .account-option.checking-account.selected {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+
+        .account-type {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+
+        .account-balance {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .balance-amount {
+            font-weight: 600;
+            color: #10b981;
+        }
+
+        .payment-modes {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .payment-mode {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .payment-mode:hover {
+            border-color: #d1d5db;
+            background: #f9fafb;
+        }
+
+        .payment-mode.selected {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .payment-mode-name {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .payment-mode-limit {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .payment-mode-time {
+            font-size: 12px;
+            color: #059669;
+            font-weight: 500;
+        }
+
+        .amount-input-container {
+            position: relative;
+        }
+
+        .amount-input {
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            padding: 20px;
+            letter-spacing: 1px;
+        }
+
+        .currency-symbol {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: flex-end;
+            margin-top: 32px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .transfer-step {
+            display: none;
+        }
+
+        .transfer-step.active {
+            display: block;
+        }
+
+        .confirmation-details {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .pin-input-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 32px 0;
+        }
+
+        .pin-digit {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            background: white;
+        }
+
+        .pin-digit:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .transaction-success {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+
+        .success-message {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+
+        .transaction-id {
+            color: #6b7280;
+            font-size: 16px;
+            margin-bottom: 32px;
+        }
+
+        .receipt-actions {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .loading-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loading-content {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .transfer-container {
+                padding: 16px;
+            }
+
+            .transfer-card {
+                padding: 24px 20px;
+            }
+
+            .account-selector {
+                grid-template-columns: 1fr;
+            }
+
+            .payment-modes {
+                grid-template-columns: 1fr;
+            }
+
+            .progress-steps {
+                gap: 8px;
+            }
+
+            .step-connector {
+                width: 20px;
+            }
+
+            .step-label {
+                display: none;
+            }
+
+            .receipt-actions {
+                flex-direction: column;
+            }
+
+            .pin-input-container {
+                gap: 8px;
+            }
+
+            .pin-digit {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="transfer-header">
+        <div class="header-content">
+            <div class="header-left">
+                <button class="back-btn" onclick="goBack()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <h1 class="page-title">Fund Transfer</h1>
+            </div>
+            <div class="header-right">
+                <div class="header-user">
+                    <div class="user-avatar" id="userAvatar">U</div>
+                    <div class="user-info" id="userInfo">
+                        <div class="user-name" id="userName">User</div>
+                        <div class="user-details" id="userDetails">ID: - | Roles: -</div>
+                        <div class="user-dropdown" id="userDropdown">
+                            <button class="dropdown-item" id="logoutBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M16 17L21 12L16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <button class="help-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                        <path d="M9.09 9A3 3 0 0 1 12 6A3 3 0 0 1 15 9A3 3 0 0 1 12 12" stroke="currentColor" stroke-width="2"/>
+                        <path d="M12 17H12.01" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    Help
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="transfer-container">
+        <!-- Progress Indicator -->
+        <div class="progress-indicator">
+            <div class="progress-steps">
+                <div class="progress-step">
+                    <div class="step-circle active" id="step1Circle">1</div>
+                    <div class="step-label">Select Payee</div>
+                </div>
+                <div class="step-connector" id="connector1"></div>
+                <div class="progress-step">
+                    <div class="step-circle pending" id="step2Circle">2</div>
+                    <div class="step-label">Payment Details</div>
+                </div>
+                <div class="step-connector" id="connector2"></div>
+                <div class="progress-step">
+                    <div class="step-circle pending" id="step3Circle">3</div>
+                    <div class="step-label">Confirmation</div>
+                </div>
+                <div class="step-connector" id="connector3"></div>
+                <div class="progress-step">
+                    <div class="step-circle pending" id="step4Circle">4</div>
+                    <div class="step-label">Security</div>
+                </div>
+                <div class="step-connector" id="connector4"></div>
+                <div class="progress-step">
+                    <div class="step-circle pending" id="step5Circle">5</div>
+                    <div class="step-label">Complete</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 1: Select Payee -->
+        <div class="transfer-step active" id="step1">
+            <div class="transfer-card">
+                <h2 style="margin-bottom: 24px; color: #1f2937;">Select Payee</h2>
+                
+                <div class="form-group">
+                    <label class="form-label" for="payeeSearch">Search or Select Payee</label>
+                    <div class="payee-dropdown">
+                        <input 
+                            type="text" 
+                            id="payeeSearch" 
+                            class="form-input" 
+                            placeholder="Type payee name or account number..."
+                            autocomplete="off"
+                        >
+                        <div class="payee-suggestions" id="payeeSuggestions">
+                            <!-- Dynamic payee suggestions will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <button type="button" class="btn btn-secondary" onclick="showAddPayeeForm()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                            <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="2"/>
+                            <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        Add New Payee
+                    </button>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="continueToStep2" onclick="goToStep(2)" disabled>
+                        Continue
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Payment Details -->
+        <div class="transfer-step" id="step2">
+            <div class="transfer-card">
+                <h2 style="margin-bottom: 24px; color: #1f2937;">Payment Details</h2>
+                
+                <div class="form-group">
+                    <label class="form-label">Transfer From</label>
+                    <div class="account-selector">
+                        <div class="account-option savings-account" id="savingsAccount" onclick="selectAccount('savings')">
+                            <div class="account-type">Savings Account</div>
+                            <div class="account-balance">Balance: <span class="balance-amount" id="savingsBalance">₹0.00</span></div>
+                        </div>
+                        <div class="account-option checking-account" id="checkingAccount" onclick="selectAccount('checking')">
+                            <div class="account-type">Checking Account</div>
+                            <div class="account-balance">Balance: <span class="balance-amount" id="checkingBalance">₹0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Payment Mode</label>
+                    <div class="payment-modes">
+                        <div class="payment-mode" id="upiMode" onclick="selectPaymentMode('UPI')">
+                            <div class="payment-mode-name">UPI</div>
+                            <div class="payment-mode-limit">Up to ₹1,00,000</div>
+                            <div class="payment-mode-time">Instant</div>
+                        </div>
+                        <div class="payment-mode" id="impsMode" onclick="selectPaymentMode('IMPS')">
+                            <div class="payment-mode-name">IMPS</div>
+                            <div class="payment-mode-limit">Up to ₹5,00,000</div>
+                            <div class="payment-mode-time">Instant</div>
+                        </div>
+                        <div class="payment-mode" id="neftMode" onclick="selectPaymentMode('NEFT')">
+                            <div class="payment-mode-name">NEFT</div>
+                            <div class="payment-mode-limit">Up to ₹50,00,000</div>
+                            <div class="payment-mode-time">2-3 hours</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transferAmount">Transfer Amount</label>
+                    <div class="amount-input-container">
+                        <span class="currency-symbol">₹</span>
+                        <input 
+                            type="number" 
+                            id="transferAmount" 
+                            class="form-input amount-input" 
+                            placeholder="0.00"
+                            step="0.01"
+                            min="1"
+                        >
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transferNote">Transfer Note (Optional)</label>
+                    <input 
+                        type="text" 
+                        id="transferNote" 
+                        class="form-input" 
+                        placeholder="Enter purpose of transfer..."
+                        maxlength="100"
+                    >
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="goToStep(1)">Back</button>
+                    <button class="btn btn-primary" id="continueToStep3" onclick="goToStep(3)" disabled>
+                        Continue
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Confirmation -->
+        <div class="transfer-step" id="step3">
+            <div class="transfer-card">
+                <h2 style="margin-bottom: 24px; color: #1f2937;">Review Transfer Details</h2>
+                
+                <div class="confirmation-details" id="confirmationDetails">
+                    <!-- Dynamic confirmation details will be populated here -->
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="goToStep(2)">Back</button>
+                    <button class="btn btn-primary" onclick="goToStep(4)">
+                        Confirm & Proceed
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Security PIN -->
+        <div class="transfer-step" id="step4">
+            <div class="transfer-card">
+                <h2 style="margin-bottom: 24px; color: #1f2937; text-align: center;">Enter Transaction PIN</h2>
+                
+                <p style="text-align: center; color: #6b7280; margin-bottom: 32px;">
+                    Please enter your 6-digit transaction PIN to authorize this transfer
+                </p>
+
+                <div class="pin-input-container" id="pinContainer">
+                    <input type="password" class="pin-digit" maxlength="1" id="pin1">
+                    <input type="password" class="pin-digit" maxlength="1" id="pin2">
+                    <input type="password" class="pin-digit" maxlength="1" id="pin3">
+                    <input type="password" class="pin-digit" maxlength="1" id="pin4">
+                    <input type="password" class="pin-digit" maxlength="1" id="pin5">
+                    <input type="password" class="pin-digit" maxlength="1" id="pin6">
+                </div>
+
+                <div id="pinError" class="error-message" style="display: none;">
+                    Invalid PIN. Please try again.
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="goToStep(3)">Back</button>
+                    <button class="btn btn-primary" id="processTransfer" onclick="processTransfer()" disabled>
+                        Process Transfer
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 5: Success -->
+        <div class="transfer-step" id="step5">
+            <div class="transfer-card">
+                <div class="transaction-success">
+                    <div class="success-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h2 class="success-message">Transfer Successful!</h2>
+                    <p class="transaction-id">Transaction ID: <span id="transactionId">TXN123456789</span></p>
+                    
+                    <div class="confirmation-details" id="finalTransactionDetails">
+                        <!-- Final transaction details will be populated here -->
+                    </div>
+
+                    <div class="receipt-actions">
+                        <button class="btn btn-secondary" onclick="downloadReceipt()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                                <path d="M21 15V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <polyline points="7,10 12,15 17,10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Download Receipt
+                        </button>
+                        <button class="btn btn-primary" onclick="makeAnotherTransfer()">
+                            Make Another Transfer
+                        </button>
+                        <button class="btn btn-secondary" onclick="goToDashboard()">
+                            Back to Dashboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Processing your transfer...</p>
+        </div>
+    </div>
+
+    <!-- Logout Confirmation Modal -->
+    <div class="modal-overlay" id="logoutModal">
+        <div class="modal-content">
+            <h3 class="modal-title">Confirm Logout</h3>
+            <p class="modal-message">Are you sure you want to logout? You will lose your current transfer progress and be redirected to the login page.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" id="cancelLogout">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="confirmLogout">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Payee Modal (will be implemented separately) -->
+    <!-- This would be a separate modal component for adding new payees -->
+
+    <script>
+        class FundTransferManager {
+            constructor() {
+                this.currentStep = 1;
+                this.selectedPayee = null;
+                this.selectedAccount = null;
+                this.selectedPaymentMode = null;
+                this.transferAmount = 0;
+                this.transferNote = '';
+                this.userAccounts = [];
+                this.payees = [];
+                this.transactionId = null;
+                
+                this.initializeElements();
+                this.initializeEventListeners();
+                this.loadUserData();
+                this.loadPayees();
+            }
+
+            initializeElements() {
+                // User elements
+                this.userAvatar = document.getElementById('userAvatar');
+                this.userName = document.getElementById('userName');
+                this.userDetails = document.getElementById('userDetails');
+                this.userInfo = document.getElementById('userInfo');
+                this.userDropdown = document.getElementById('userDropdown');
+                this.logoutModal = document.getElementById('logoutModal');
+                this.cancelLogout = document.getElementById('cancelLogout');
+                this.confirmLogout = document.getElementById('confirmLogout');
+                
+                // Transfer form elements
+                this.payeeSearch = document.getElementById('payeeSearch');
+                this.payeeSuggestions = document.getElementById('payeeSuggestions');
+                this.transferAmountInput = document.getElementById('transferAmount');
+                this.transferNoteInput = document.getElementById('transferNote');
+                this.checkingBalanceSpan = document.getElementById('checkingBalance');
+                this.savingsBalanceSpan = document.getElementById('savingsBalance');
+                this.confirmationDetails = document.getElementById('confirmationDetails');
+                this.finalTransactionDetails = document.getElementById('finalTransactionDetails');
+                this.transactionIdSpan = document.getElementById('transactionId');
+                this.loadingOverlay = document.getElementById('loadingOverlay');
+                this.pinError = document.getElementById('pinError');
+
+                // PIN inputs
+                this.pinInputs = [];
+                for (let i = 1; i <= 6; i++) {
+                    this.pinInputs.push(document.getElementById(`pin${i}`));
+                }
+
+                // Continue buttons
+                this.continueToStep2 = document.getElementById('continueToStep2');
+                this.continueToStep3 = document.getElementById('continueToStep3');
+                this.processTransferBtn = document.getElementById('processTransfer');
+            }
+
+            initializeEventListeners() {
+                // User dropdown functionality
+                this.userAvatar.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleUserDropdown();
+                });
+
+                this.userInfo.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleUserDropdown();
+                });
+
+                // Logout functionality
+                const logoutBtn = this.userDropdown.querySelector('#logoutBtn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.showLogoutModal();
+                    });
+                }
+
+                this.cancelLogout.addEventListener('click', () => this.hideLogoutModal());
+                this.confirmLogout.addEventListener('click', () => this.handleLogout());
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.header-user')) {
+                        this.hideUserDropdown();
+                    }
+                    if (!e.target.closest('.payee-dropdown')) {
+                        this.hidePayeeSuggestions();
+                    }
+                });
+
+                // Close modal when clicking overlay
+                this.logoutModal.addEventListener('click', (e) => {
+                    if (e.target === this.logoutModal) {
+                        this.hideLogoutModal();
+                    }
+                });
+
+                // Payee search
+                this.payeeSearch.addEventListener('input', (e) => this.handlePayeeSearch(e.target.value));
+                this.payeeSearch.addEventListener('focus', () => this.showPayeeSuggestions());
+
+                // Amount input
+                this.transferAmountInput.addEventListener('input', () => this.validateStep2());
+
+                // PIN inputs
+                this.pinInputs.forEach((input, index) => {
+                    input.addEventListener('input', (e) => this.handlePinInput(e, index));
+                    input.addEventListener('keydown', (e) => this.handlePinKeydown(e, index));
+                });
+            }
+
+            async loadUserData() {
+                const token = localStorage.getItem('vubank_token');
+                const userStr = localStorage.getItem('vubank_user');
+
+                if (!token || !userStr) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                try {
+                    // Load account data from accounts service directly
+                    const apiUrl = 'http://localhost:8002'; // Accounts service
+                    const response = await fetch(`${apiUrl}/internal/accounts`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                            'Origin': window.location.origin,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-Api-Client': 'web-portal'
+                        }
+                    });
+
+                    if (response.status === 401) {
+                        // Token expired or invalid
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Raw API response:', data);
+                        
+                        // Transform account data to match expected structure
+                        this.userAccounts = data.accounts.map(account => {
+                            // Map "current" account type to "checking" for display
+                            let accountType = account.accountType.toLowerCase();
+                            if (accountType === 'current') {
+                                accountType = 'checking';
+                            }
+                            
+                            return {
+                                id: account.id,
+                                account_type: accountType,
+                                balance: account.balance,
+                                accountNumber: account.accountNumber,
+                                accountName: account.accountName || account.accountType,
+                                currency: account.currency || 'INR'
+                            };
+                        });
+                        
+                        console.log('Transformed account data:', this.userAccounts);
+                        this.updateAccountBalances();
+                    } else {
+                        console.error('Failed to load account data:', response.status, response.statusText);
+                    }
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                }
+            }
+
+            updateAccountBalances() {
+                console.log('Updating account balances. Total accounts:', this.userAccounts.length);
+                console.log('Account data:', this.userAccounts);
+                
+                const checkingAccount = this.userAccounts.find(acc => acc.account_type === 'checking');
+                const savingsAccount = this.userAccounts.find(acc => acc.account_type === 'savings');
+
+                console.log('Checking account found:', checkingAccount);
+                console.log('Savings account found:', savingsAccount);
+
+                if (checkingAccount) {
+                    const balance = `₹${parseFloat(checkingAccount.balance).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+                    this.checkingBalanceSpan.textContent = balance;
+                    console.log('Updated checking balance to:', balance);
+                } else {
+                    this.checkingBalanceSpan.textContent = '₹0.00';
+                    console.log('No checking account found, set to ₹0.00');
+                }
+
+                if (savingsAccount) {
+                    const balance = `₹${parseFloat(savingsAccount.balance).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+                    this.savingsBalanceSpan.textContent = balance;
+                    console.log('Updated savings balance to:', balance);
+                } else {
+                    this.savingsBalanceSpan.textContent = '₹0.00';
+                    console.log('No savings account found, set to ₹0.00');
+                }
+            }
+
+            loadPayees() {
+                // Mock payees data - In real app, this would come from API
+                this.payees = [
+                    { id: 1, name: 'John Doe', accountNumber: '1234567890', bankName: 'HDFC Bank' },
+                    { id: 2, name: 'Jane Smith', accountNumber: '9876543210', bankName: 'ICICI Bank' },
+                    { id: 3, name: 'Bob Johnson', accountNumber: '5555666677', bankName: 'SBI' },
+                    { id: 4, name: 'Alice Brown', accountNumber: '1111222233', bankName: 'Axis Bank' },
+                    { id: 5, name: 'Charlie Wilson', accountNumber: '7777888899', bankName: 'Kotak Bank' }
+                ];
+            }
+
+            handlePayeeSearch(query) {
+                if (query.length === 0) {
+                    this.selectedPayee = null;
+                    this.continueToStep2.disabled = true;
+                    this.hidePayeeSuggestions();
+                    return;
+                }
+
+                const filteredPayees = this.payees.filter(payee =>
+                    payee.name.toLowerCase().includes(query.toLowerCase()) ||
+                    payee.accountNumber.includes(query)
+                );
+
+                this.displayPayeeSuggestions(filteredPayees, query);
+            }
+
+            displayPayeeSuggestions(payees, query) {
+                this.payeeSuggestions.innerHTML = '';
+
+                payees.forEach(payee => {
+                    const item = document.createElement('div');
+                    item.className = 'suggestion-item';
+                    item.innerHTML = `
+                        <div style="font-weight: 600;">${payee.name}</div>
+                        <div style="font-size: 12px; color: #6b7280;">${payee.accountNumber} - ${payee.bankName}</div>
+                    `;
+                    item.onclick = () => this.selectPayee(payee);
+                    this.payeeSuggestions.appendChild(item);
+                });
+
+                if (payees.length === 0) {
+                    const addPayeeItem = document.createElement('div');
+                    addPayeeItem.className = 'suggestion-item add-payee-item';
+                    addPayeeItem.innerHTML = `
+                        <div>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="2"/>
+                                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            Add "${query}" as new payee
+                        </div>
+                    `;
+                    addPayeeItem.onclick = () => this.showAddPayeeForm(query);
+                    this.payeeSuggestions.appendChild(addPayeeItem);
+                }
+
+                this.showPayeeSuggestions();
+            }
+
+            selectPayee(payee) {
+                this.selectedPayee = payee;
+                this.payeeSearch.value = payee.name;
+                this.hidePayeeSuggestions();
+                this.continueToStep2.disabled = false;
+            }
+
+            showPayeeSuggestions() {
+                this.payeeSuggestions.classList.add('show');
+            }
+
+            hidePayeeSuggestions() {
+                this.payeeSuggestions.classList.remove('show');
+            }
+
+            toggleUserDropdown() {
+                const isVisible = this.userDropdown.style.display === 'block';
+                this.userDropdown.style.display = isVisible ? 'none' : 'block';
+            }
+
+            hideUserDropdown() {
+                this.userDropdown.style.display = 'none';
+            }
+
+            showLogoutModal() {
+                this.hideUserDropdown();
+                this.logoutModal.style.display = 'flex';
+            }
+
+            hideLogoutModal() {
+                this.logoutModal.style.display = 'none';
+            }
+
+            handleLogout() {
+                // Clear session/auth data if any
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // Redirect to login page
+                window.location.href = '/login.html';
+            }
+
+            showAddPayeeForm(query = '') {
+                // This would open a modal to add a new payee
+                // For now, we'll just show an alert
+                alert(`Add Payee functionality would open here${query ? ` for "${query}"` : ''}`);
+            }
+
+            selectAccount(accountType) {
+                document.querySelectorAll('.account-option').forEach(el => el.classList.remove('selected'));
+                document.getElementById(`${accountType}Account`).classList.add('selected');
+                this.selectedAccount = accountType;
+                this.validateStep2();
+            }
+
+            selectPaymentMode(mode) {
+                document.querySelectorAll('.payment-mode').forEach(el => el.classList.remove('selected'));
+                document.getElementById(`${mode.toLowerCase()}Mode`).classList.add('selected');
+                this.selectedPaymentMode = mode;
+                this.validateStep2();
+            }
+
+            validateStep2() {
+                const amount = parseFloat(this.transferAmountInput.value);
+                const isValid = this.selectedAccount && this.selectedPaymentMode && amount > 0;
+                
+                console.log('Validating step 2:', {
+                    selectedAccount: this.selectedAccount,
+                    selectedPaymentMode: this.selectedPaymentMode,
+                    amount: amount,
+                    isValid: isValid
+                });
+                
+                this.continueToStep3.disabled = !isValid;
+
+                // Validate amount against account balance
+                if (amount > 0 && this.selectedAccount) {
+                    const account = this.userAccounts.find(acc => acc.account_type === this.selectedAccount);
+                    console.log('Selected account for validation:', account);
+                    
+                    if (account && amount > parseFloat(account.balance)) {
+                        this.continueToStep3.disabled = true;
+                        console.log('Amount exceeds balance. Transfer disabled.');
+                    }
+                }
+            }
+
+            goToStep(stepNumber) {
+                if (stepNumber === 3) {
+                    this.transferAmount = parseFloat(this.transferAmountInput.value);
+                    this.transferNote = this.transferNoteInput.value;
+                    this.updateConfirmationDetails();
+                }
+
+                // Hide current step
+                document.querySelector('.transfer-step.active').classList.remove('active');
+                
+                // Show target step
+                document.getElementById(`step${stepNumber}`).classList.add('active');
+                
+                // Update progress indicator
+                this.updateProgressIndicator(stepNumber);
+                
+                this.currentStep = stepNumber;
+            }
+
+            updateProgressIndicator(activeStep) {
+                for (let i = 1; i <= 5; i++) {
+                    const circle = document.getElementById(`step${i}Circle`);
+                    const connector = document.getElementById(`connector${i}`);
+
+                    if (i < activeStep) {
+                        circle.className = 'step-circle completed';
+                        if (connector) connector.className = 'step-connector completed';
+                    } else if (i === activeStep) {
+                        circle.className = 'step-circle active';
+                        if (connector) connector.className = 'step-connector';
+                    } else {
+                        circle.className = 'step-circle pending';
+                        if (connector) connector.className = 'step-connector';
+                    }
+                }
+            }
+
+            updateConfirmationDetails() {
+                this.confirmationDetails.innerHTML = `
+                    <div class="detail-row">
+                        <span class="detail-label">Transfer To:</span>
+                        <span class="detail-value">${this.selectedPayee.name}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Account Number:</span>
+                        <span class="detail-value">${this.selectedPayee.accountNumber}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Bank:</span>
+                        <span class="detail-value">${this.selectedPayee.bankName}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Transfer From:</span>
+                        <span class="detail-value">${this.selectedAccount.charAt(0).toUpperCase() + this.selectedAccount.slice(1)} Account</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Payment Mode:</span>
+                        <span class="detail-value">${this.selectedPaymentMode}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Amount:</span>
+                        <span class="detail-value" style="font-size: 18px; color: #059669;">₹${this.transferAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    ${this.transferNote ? `
+                    <div class="detail-row">
+                        <span class="detail-label">Note:</span>
+                        <span class="detail-value">${this.transferNote}</span>
+                    </div>
+                    ` : ''}
+                `;
+            }
+
+            handlePinInput(e, index) {
+                const value = e.target.value;
+                
+                if (value && index < 5) {
+                    this.pinInputs[index + 1].focus();
+                }
+
+                this.validatePin();
+            }
+
+            handlePinKeydown(e, index) {
+                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                    this.pinInputs[index - 1].focus();
+                }
+            }
+
+            validatePin() {
+                const pin = this.pinInputs.map(input => input.value).join('');
+                this.processTransferBtn.disabled = pin.length !== 6;
+                this.pinError.style.display = 'none';
+            }
+
+            async processTransfer() {
+                const pin = this.pinInputs.map(input => input.value).join('');
+                
+                // Validate PIN (mock validation - in real app, validate with server)
+                if (pin !== '123456') {
+                    this.pinError.style.display = 'block';
+                    this.pinInputs.forEach(input => input.value = '');
+                    this.pinInputs[0].focus();
+                    return;
+                }
+
+                // Show loading
+                this.loadingOverlay.classList.add('show');
+
+                try {
+                    // Simulate API call
+                    await this.simulateTransferProcess();
+                    
+                    // Generate transaction ID
+                    this.transactionId = 'TXN' + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase();
+                    this.transactionIdSpan.textContent = this.transactionId;
+                    
+                    // Update final transaction details
+                    this.updateFinalTransactionDetails();
+                    
+                    // Hide loading and go to success step
+                    this.loadingOverlay.classList.remove('show');
+                    this.goToStep(5);
+                    
+                } catch (error) {
+                    this.loadingOverlay.classList.remove('show');
+                    alert('Transfer failed. Please try again.');
+                }
+            }
+
+            async simulateTransferProcess() {
+                // Simulate processing time
+                return new Promise(resolve => setTimeout(resolve, 3000));
+            }
+
+            updateFinalTransactionDetails() {
+                const now = new Date();
+                
+                this.finalTransactionDetails.innerHTML = `
+                    <div class="detail-row">
+                        <span class="detail-label">Date & Time:</span>
+                        <span class="detail-value">${now.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Transfer To:</span>
+                        <span class="detail-value">${this.selectedPayee.name}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Account Number:</span>
+                        <span class="detail-value">${this.selectedPayee.accountNumber}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Amount Transferred:</span>
+                        <span class="detail-value" style="font-size: 18px; color: #059669;">₹${this.transferAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Payment Mode:</span>
+                        <span class="detail-value">${this.selectedPaymentMode}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Status:</span>
+                        <span class="detail-value" style="color: #10b981; font-weight: 600;">Successful</span>
+                    </div>
+                `;
+            }
+
+            async downloadReceipt() {
+                try {
+                    // Get the selected account details
+                    const account = this.userAccounts.find(acc => acc.account_type === this.selectedAccount);
+                    const accountNumber = account ? account.accountNumber : '****0000';
+                    
+                    // Prepare transaction data for PDF generation
+                    const transactionData = {
+                        transactionId: this.transactionId,
+                        fromAccount: `${this.selectedAccount} - ****${accountNumber.slice(-4)}`,
+                        toAccount: this.selectedPayee.accountNumber,
+                        payeeName: this.selectedPayee.name,
+                        amount: this.transferAmount,
+                        paymentMode: this.selectedPaymentMode.toUpperCase(),
+                        timestamp: new Date().toISOString(),
+                        status: 'SUCCESS',
+                        customerName: 'John Doe', // This should come from user session
+                        customerId: 'CUST001' // This should come from user session
+                    };
+
+                    // Call PDF generation service
+                    const response = await fetch('http://localhost:8003/api/pdf/generate-receipt', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(transactionData)
+                    });
+
+                    if (response.ok) {
+                        // Create blob and download the PDF
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `VuBank_Receipt_${this.transactionId}_${new Date().toISOString().slice(0, 10)}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        
+                        // Show success message
+                        alert('Receipt downloaded successfully!');
+                    } else {
+                        throw new Error('Failed to generate receipt');
+                    }
+                } catch (error) {
+                    console.error('Error downloading receipt:', error);
+                    alert('Unable to download receipt. Please try again later.');
+                }
+            }
+
+            makeAnotherTransfer() {
+                // Reset form and go back to step 1
+                this.resetForm();
+                this.goToStep(1);
+            }
+
+            resetForm() {
+                this.selectedPayee = null;
+                this.selectedAccount = null;
+                this.selectedPaymentMode = null;
+                this.transferAmount = 0;
+                this.transferNote = '';
+                
+                // Clear form inputs
+                this.payeeSearch.value = '';
+                this.transferAmountInput.value = '';
+                this.transferNoteInput.value = '';
+                
+                // Clear selections
+                document.querySelectorAll('.account-option').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('.payment-mode').forEach(el => el.classList.remove('selected'));
+                
+                // Clear PIN
+                this.pinInputs.forEach(input => input.value = '');
+                
+                // Reset buttons
+                this.continueToStep2.disabled = true;
+                this.continueToStep3.disabled = true;
+                this.processTransferBtn.disabled = true;
+            }
+
+            goToDashboard() {
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        // Global functions for onclick handlers
+        function goBack() {
+            window.location.href = 'dashboard.html';
+        }
+
+        function goToStep(stepNumber) {
+            window.fundTransferManager.goToStep(stepNumber);
+        }
+
+        function selectAccount(accountType) {
+            window.fundTransferManager.selectAccount(accountType);
+        }
+
+        function selectPaymentMode(mode) {
+            window.fundTransferManager.selectPaymentMode(mode);
+        }
+
+        function showAddPayeeForm(query) {
+            window.fundTransferManager.showAddPayeeForm(query);
+        }
+
+        function processTransfer() {
+            window.fundTransferManager.processTransfer();
+        }
+
+        function downloadReceipt() {
+            window.fundTransferManager.downloadReceipt();
+        }
+
+        function makeAnotherTransfer() {
+            window.fundTransferManager.makeAnotherTransfer();
+        }
+
+        function goToDashboard() {
+            window.fundTransferManager.goToDashboard();
+        }
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.fundTransferManager = new FundTransferManager();
+        });
+    </script>
+</body>
+</html>

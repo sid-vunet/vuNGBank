@@ -26,8 +26,10 @@ Comprehensive documentation is available in the [`docs/`](./docs/) folder:
 ## Features
 
 - **Authentication System**: User login with User ID/Email and Group ID
-- **Dashboard Interface**: Modern banking dashboard matching SCB's design
+- **Dashboard Interface**: Modern banking dashboard matching VuBank's design
 - **Account Management**: Multiple account types with balance tracking
+- **Fund Transfer System**: Complete multi-step transfer process with payee management
+- **PDF Receipt Generation**: Professional PDF receipts for transactions
 - **Transaction History**: Synthetic transaction data with realistic patterns
 - **Microservices Architecture**: Modular backend services for different banking operations
 - **Responsive Design**: Mobile-friendly interface
@@ -36,26 +38,63 @@ Comprehensive documentation is available in the [`docs/`](./docs/) folder:
 ## Technology Stack
 
 ### Frontend
-- React 18.2.0
-- Axios for API communication
-- Material-UI components
-- React Router for navigation
-- CSS3 with custom styling matching SCB branding
+- HTML5 with vanilla JavaScript
+- Modern CSS3 with custom styling matching VuBank branding
+- Responsive design principles
+- AJAX for API communication
 
-### Backend
-- Node.js with Express.js
-- JWT authentication
-- bcrypt for password hashing
-- Faker.js for synthetic data generation
-- CORS enabled for cross-origin requests
+### Backend Microservices
+- **Go Services**: Login gateway and accounts service
+- **Python Service**: Authentication and user management
+- **Java Service**: PDF receipt generation with iText
+- **Node.js**: Main backend coordination
+- **PostgreSQL**: Primary database
+- JWT authentication across services
+- Docker containerization for all services
 
 ## Getting Started
 
-### Prerequisites
-- Node.js (version 16 or higher)
-- npm or yarn package manager
+### Service Architecture
 
-### Installation
+VuBank consists of multiple microservices:
+
+| Service | Technology | Port | Purpose |
+|---------|------------|------|---------|
+| Frontend | HTML/CSS/JS | 3001 | User interface |
+| Login Gateway | Go | 8000 | Main API gateway |
+| Auth Service | Python | 8001 | User authentication |
+| Accounts Service | Go | 8002 | Account management |
+| PDF Service | Java/Spring Boot | 8003 | Receipt generation |
+| Database | PostgreSQL | 5432 | Data persistence |
+
+### Prerequisites
+- Docker and Docker Compose
+- Maven (for PDF service)
+- Node.js 16+ (for optional React frontend)
+
+### Quick Start
+
+1. **Start All Services**
+   ```bash
+   # Clone and navigate to project
+   cd vuNGBank
+   
+   # Start all services using Docker Compose
+   ./manage-services.sh start
+   ```
+
+2. **Build PDF Service (if needed)**
+   ```bash
+   # Build the Java PDF service separately
+   ./build-pdf-service.sh
+   ```
+
+3. **Access the Application**
+   - **Frontend**: http://localhost:3001
+   - **API Gateway**: http://localhost:8000
+   - **PDF Service**: http://localhost:8003
+
+### Manual Installation (Alternative)
 
 1. **Install Backend Dependencies**
    ```bash

@@ -75,6 +75,12 @@ check_status() {
         print_error "❌ Go Accounts Service (8002) - Not Running"
     fi
     
+    if docker compose ps | grep -q "pdf-receipt-java-service.*Up"; then
+        print_success "✅ Java PDF Receipt Service (8003) - Running"
+    else
+        print_error "❌ Java PDF Receipt Service (8003) - Not Running"
+    fi
+    
     if docker compose ps | grep -q "vubank-postgres.*Up"; then
         print_success "✅ PostgreSQL Database (5432) - Running"
     else
@@ -94,6 +100,7 @@ check_status() {
     echo "   Login API:    http://localhost:8000"
     echo "   Auth Service: http://localhost:8001"
     echo "   Accounts API: http://localhost:8002"
+    echo "   PDF Service:  http://localhost:8003"
     echo "   Database:     localhost:5432"
     echo ""
 }
@@ -231,6 +238,12 @@ health_check() {
         print_error "❌ Accounts Service health check failed"
     fi
     
+    if curl -s "http://localhost:8003/api/pdf/health" >/dev/null 2>&1; then
+        print_success "✅ PDF Receipt Service health check passed"
+    else
+        print_error "❌ PDF Receipt Service health check failed"
+    fi
+    
     if curl -s "http://localhost:3001" >/dev/null 2>&1; then
         print_success "✅ Frontend Server health check passed"
     else
@@ -263,6 +276,7 @@ show_help() {
     echo "  • Go Login Gateway (port 8000)"
     echo "  • Python Auth Service (port 8001)"
     echo "  • Go Accounts Service (port 8002)"
+    echo "  • Java PDF Receipt Service (port 8003)"
     echo "  • HTML Frontend Server (port 3001)"
     echo ""
 }

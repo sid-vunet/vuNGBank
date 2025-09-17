@@ -100,6 +100,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # Java PDF Receipt Service
+  pdf-receipt-java-service:
+    build:
+      context: ./backend/services/pdf-receipt-java-service
+      dockerfile: Dockerfile
+    container_name: pdf-receipt-java-service
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+    ports:
+      - "8003:8003"
+    networks:
+      - vubank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/api/pdf/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   # React Frontend (optional - can run locally)
   vubank-frontend:
     build:
