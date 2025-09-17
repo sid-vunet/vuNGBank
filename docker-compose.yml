@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  vubank-postgres:
+    image: postgres:15
+    container_name: vubank-postgres
+    environment:
+      POSTGRES_DB: vubank_db
+      POSTGRES_USER: vubank_user
+      POSTGRES_PASSWORD: vubank_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/login-postgresdb/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - vubank-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vubank_user -d vubank_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Python Authentication Service
+  login-python-authenticator:
+    build:
+      context: ./backend/services/login-python-authenticator
+      dockerfile: Dockerfile
+    container_name: login-python-authenticator
+    environment:
+      DB_HOST: vubank-postgres
+      DB_PORT: 5432
+      DB_USER: vubank_user
+      DB_PASSWORD: vubank_pass
+      DB_NAME: vubank_db
+      DB_SSLMODE: disable
+      PUBLIC_API_PORT: 8001
+    ports:
+      - "8001:8001"
+    depends_on:
+      vubank-postgres:
+        condition: service_healthy
+    networks:
+      - vubank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go Login Gateway Service
+  login-go-service:
+    build:
+      context: ./backend/services/login-go-service
+      dockerfile: Dockerfile
+    container_name: login-go-service
+    environment:
+      PUBLIC_API_PORT: 8000
+      AUTH_SERVICE_URL: http://login-python-authenticator:8001
+      ACCOUNTS_SERVICE_URL: http://accounts-go-service:8002
+      JWT_SECRET: vubank-super-secret-jwt-key-2023
+      API_CLIENT: web-portal
+    ports:
+      - "8000:8000"
+    depends_on:
+      login-python-authenticator:
+        condition: service_healthy
+    networks:
+      - vubank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go Accounts Service
+  accounts-go-service:
+    build:
+      context: ./backend/services/accounts-go-service
+      dockerfile: Dockerfile
+    container_name: accounts-go-service
+    environment:
+      PUBLIC_API_PORT: 8002
+      DB_HOST: vubank-postgres
+      DB_PORT: 5432
+      DB_USER: vubank_user
+      DB_PASSWORD: vubank_pass
+      DB_NAME: vubank_db
+      DB_SSLMODE: disable
+      JWT_SECRET: vubank-super-secret-jwt-key-2023
+    ports:
+      - "8002:8002"
+    depends_on:
+      vubank-postgres:
+        condition: service_healthy
+    networks:
+      - vubank-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # React Frontend (optional - can run locally)
+  vubank-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vubank-frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - login-go-service
+    networks:
+      - vubank-network
+    profiles:
+      - frontend  # Use 'docker-compose --profile frontend up' to include frontend
+
+volumes:
+  postgres_data:
+
+networks:
+  vubank-network:
+    driver: bridge
