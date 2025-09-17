@@ -244,10 +244,19 @@ login_requests → users
 
 ## Monitoring & Observability
 
+### Elastic APM Implementation
+- **APM Server**: http://91.203.133.240:30200
+- **Backend APM**: 
+  - Go Login Service (vubank-login-service)
+  - Python Auth Service (vubank-auth-service)
+- **Frontend RUM**: Complete user monitoring across all pages
+- **Distributed Tracing**: End-to-end trace correlation
+- **Service Map**: Complete dependency visualization
+
 ### Health Checks
-- **Service Health**: Dedicated health endpoints
-- **Database Connectivity**: Connection validation
-- **Dependency Monitoring**: Service availability checks
+- **Service Health**: Dedicated health endpoints with APM instrumentation
+- **Database Connectivity**: Connection validation with performance tracking
+- **Dependency Monitoring**: Service availability checks with error tracking
 
 ### Logging Strategy
 - **Request Correlation**: Unique request tracking
