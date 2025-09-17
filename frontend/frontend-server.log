@@ -41,3 +41,6 @@
 ::1 - - [17/Sep/2025 17:08:51] "GET /login.html HTTP/1.1" 304 -
 ::1 - - [17/Sep/2025 17:08:59] "GET /login.html HTTP/1.1" 304 -
 ::1 - - [17/Sep/2025 17:09:06] "GET /dashboard.html HTTP/1.1" 304 -
+::1 - - [17/Sep/2025 17:12:37] "GET /dashboard.html HTTP/1.1" 200 -
+::1 - - [17/Sep/2025 17:12:38] "GET /dashboard.html HTTP/1.1" 200 -
+::1 - - [17/Sep/2025 17:12:44] "GET /dashboard.html HTTP/1.1" 200 -

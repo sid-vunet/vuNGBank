@@ -417,6 +417,18 @@
             background: #e5e7eb;
         }
 
+        .action-btn:disabled {
+            background: #f9fafb !important;
+            color: #9ca3af !important;
+            cursor: not-allowed !important;
+            border-color: #e5e7eb !important;
+            opacity: 0.6;
+        }
+
+        .action-btn:disabled:hover {
+            background: #f9fafb !important;
+        }
+
         .transaction-list {
             max-height: 300px;
             overflow-y: auto;
@@ -599,8 +611,8 @@
                         <div class="card-subtitle" style="margin-top: 8px;">
                             Letters of Credit, Trade Finance, Documentary Collections
                         </div>
-                        <button class="action-btn secondary" style="margin-top: 16px;">
-                            View Services
+                        <button class="action-btn secondary" style="margin-top: 16px;" disabled>
+                            View Services (Coming Soon)
                         </button>
                     </div>
 
@@ -609,8 +621,8 @@
                         <div class="card-subtitle" style="margin-top: 8px;">
                             Account Services, Payments, Collections
                         </div>
-                        <button class="action-btn secondary" style="margin-top: 16px;">
-                            Manage Cash
+                        <button class="action-btn secondary" style="margin-top: 16px;" disabled>
+                            Manage Cash (Coming Soon)
                         </button>
                     </div>
 
