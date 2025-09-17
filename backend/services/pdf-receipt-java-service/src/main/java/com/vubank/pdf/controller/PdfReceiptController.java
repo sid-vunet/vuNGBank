@@ -14,7 +14,9 @@ import java.time.format.DateTimeFormatter;
 
 @RestController
 @RequestMapping("/api/pdf")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "*", 
+    allowedHeaders = {"Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization", "X-Api-Client", "X-Request-ID", "traceparent", "tracestate"}, 
+    exposedHeaders = {"*"})
 public class PdfReceiptController {
 
     @Autowired

@@ -13,6 +13,42 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Elastic RUM Agent -->
+    <script src="https://unpkg.com/@elastic/apm-rum@5.12.0/dist/bundles/elastic-apm-rum.umd.min.js" crossorigin></script>
+    <script>
+        // Initialize Elastic RUM
+        elasticApm.init({
+            serviceName: 'vubank-frontend',
+            serverUrl: 'http://91.203.133.240:30200',
+            serviceVersion: '1.0.0',
+            environment: 'production',
+            // Page-specific configuration
+            pageLoadTransactionName: 'login-page-load',
+            // Additional configuration
+            distributedTracingOrigins: ['http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 'http://localhost:8003', 'http://localhost:5004'],
+            disableInstrumentations: [],
+            logLevel: 'info'
+        });
+        
+        // Set custom user context and labels for login page
+        elasticApm.setUserContext({
+            id: 'anonymous',
+            username: 'anonymous',
+            email: 'anonymous@vubank.com'
+        });
+        
+        elasticApm.addLabels({
+            page: 'login',
+            component: 'authentication',
+            version: '1.0.0'
+        });
+        
+        // Track page load performance
+        window.addEventListener('load', function() {
+            elasticApm.startTransaction('login-page-ready', 'page-load');
+        });
+    </script>
+    
     <style>
         /* Base styles */
         * {
@@ -738,6 +774,13 @@
             }
             
             async performLogin(forceLogin = false) {
+                // Start RUM transaction for login process
+                const loginTransaction = elasticApm.startTransaction('user-login', 'authentication');
+                loginTransaction.addLabels({
+                    force_login: forceLogin,
+                    login_attempt: true
+                });
+                
                 const formData = new FormData(this.form);
                 const apiUrl = 'http://localhost:8000'; // Default API URL
                 
@@ -746,6 +789,14 @@
                     console.log('🔄 Starting login process with 1-second delay...');
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     console.log('✅ Delay complete, proceeding with login...');
+                    
+                    // Start span for API call
+                    const apiSpan = loginTransaction.startSpan('login-api-call', 'http');
+                    apiSpan.addLabels({
+                        api_endpoint: '/api/login',
+                        method: 'POST',
+                        force_login: forceLogin
+                    });
                     
                     const response = await fetch(`${apiUrl}/api/login`, {
                         method: 'POST',
@@ -763,10 +814,23 @@
                     });
                     
                     const data = await response.json();
+                    apiSpan.end();
+                    
+                    // Add response details to transaction
+                    loginTransaction.addLabels({
+                        response_status: response.status,
+                        response_ok: response.ok,
+                        has_token: !!data.token
+                    });
                     
                     if (response.status === 409 && data.session_conflict) {
                         // Handle session conflict
+                        loginTransaction.addLabels({
+                            session_conflict: true,
+                            login_result: 'session_conflict'
+                        });
                         this.showSessionConflictDialog(data.existing_session);
+                        elasticApm.captureError(new Error('Session conflict detected'));
                         return;
                     }
                     
@@ -774,6 +838,13 @@
                         // Get form data for remember me functionality
                         const username = formData.get('username');
                         const rememberMe = formData.get('rememberMe');
+                        
+                        // Set user context in RUM
+                        elasticApm.setUserContext({
+                            id: data.user.id,
+                            username: data.user.username,
+                            email: `${data.user.username}@vubank.com`
+                        });
                         
                         // Handle remember me functionality
                         if (rememberMe) {
@@ -786,15 +857,44 @@
                         localStorage.setItem('vubank_token', data.token);
                         localStorage.setItem('vubank_user', JSON.stringify(data.user));
                         
+                        loginTransaction.addLabels({
+                            login_result: 'success',
+                            user_roles: data.user.roles.join(','),
+                            remember_me: !!rememberMe
+                        });
+                        
+                        // Track successful login
+                        elasticApm.addLabels({
+                            last_login: new Date().toISOString(),
+                            user_id: data.user.id
+                        });
+                        
                         // Redirect to dashboard
                         window.location.href = 'dashboard.html';
                     } else {
+                        loginTransaction.addLabels({
+                            login_result: 'failed',
+                            error_message: data.message || 'Login failed'
+                        });
+                        
+                        // Capture login error
+                        elasticApm.captureError(new Error(data.message || 'Login failed'));
                         this.showError(data.message || 'Login failed. Please check your credentials.');
                     }
                 } catch (error) {
                     console.error('Login error:', error);
+                    
+                    // Capture network/connection errors
+                    elasticApm.captureError(error);
+                    loginTransaction.addLabels({
+                        login_result: 'error',
+                        error_type: 'network_error',
+                        error_message: error.message
+                    });
+                    
                     this.showError('Unable to connect to server. Please try again later.');
                 } finally {
+                    loginTransaction.end();
                     this.setLoading(false);
                 }
             }

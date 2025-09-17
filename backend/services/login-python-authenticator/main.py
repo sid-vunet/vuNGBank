@@ -343,6 +343,53 @@ async def validate_session(session_id: str, jwt_token: str):
     finally:
         conn.close()
 
+# Logout endpoint
+class LogoutRequest(BaseModel):
+    user_id: int
+    session_id: Optional[str] = None
+    terminate_all_sessions: Optional[bool] = False
+
+@app.post("/logout")
+async def logout_user(request: LogoutRequest):
+    """
+    Terminate user session(s) and log the logout event
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            if request.terminate_all_sessions or not request.session_id:
+                # Terminate all active sessions for the user
+                cursor.execute("""
+                    UPDATE active_sessions 
+                    SET is_active = FALSE, terminated_reason = %s, terminated_at = NOW()
+                    WHERE user_id = %s AND is_active = TRUE
+                """, ("User logout", request.user_id))
+                affected_rows = cursor.rowcount
+                logger.info(f"Terminated {affected_rows} sessions for user {request.user_id}")
+            else:
+                # Terminate specific session
+                cursor.execute("""
+                    UPDATE active_sessions 
+                    SET is_active = FALSE, terminated_reason = %s, terminated_at = NOW()
+                    WHERE user_id = %s AND session_id = %s AND is_active = TRUE
+                """, ("User logout", request.user_id, request.session_id))
+                affected_rows = cursor.rowcount
+                logger.info(f"Terminated session {request.session_id} for user {request.user_id}")
+            
+            conn.commit()
+            
+            return {
+                "success": True, 
+                "message": "Logout successful",
+                "sessions_terminated": affected_rows
+            }
+    except Exception as e:
+        logger.error(f"Logout error: {e}")
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="Logout failed")
+    finally:
+        conn.close()
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv('PUBLIC_API_PORT', '8001'))

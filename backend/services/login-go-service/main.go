@@ -69,6 +69,12 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+type LogoutRequest struct {
+	UserID               string `json:"user_id" binding:"required"`
+	SessionID            string `json:"session_id,omitempty"`
+	TerminateAllSessions bool   `json:"terminate_all_sessions,omitempty"`
+}
+
 // JWT Claims
 type Claims struct {
 	UserID string   `json:"user_id"`
@@ -155,8 +161,8 @@ func correlationID() gin.HandlerFunc {
 }
 
 // Call Python authentication service
-func callAuthService(authURL string, username, password string, forceLogin bool, headers map[string]string) (*AuthResponse, error) {
-	span, ctx := apm.StartSpan(context.Background(), "callAuthService", "external.http")
+func callAuthService(ctx context.Context, authURL string, username, password string, forceLogin bool, headers map[string]string) (*AuthResponse, error) {
+	span, ctx := apm.StartSpan(ctx, "callAuthService", "external.http")
 	defer span.End()
 
 	authReq := AuthRequest{
@@ -202,8 +208,8 @@ func callAuthService(authURL string, username, password string, forceLogin bool,
 }
 
 // Create session in auth service
-func createSession(authURL, userID, sessionID, jwtToken, ipAddress, userAgent string) error {
-	span, ctx := apm.StartSpan(context.Background(), "createSession", "external.http")
+func createSession(ctx context.Context, authURL, userID, sessionID, jwtToken, ipAddress, userAgent string) error {
+	span, ctx := apm.StartSpan(ctx, "createSession", "external.http")
 	defer span.End()
 
 	sessionReq := map[string]interface{}{
@@ -259,6 +265,14 @@ func generateJWT(userID string, roles []string, jwtSecret string) (string, error
 // Login handler
 func loginHandler(config *Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Debug: Check if APM transaction exists
+		tx := apm.TransactionFromContext(c.Request.Context())
+		if tx != nil {
+			log.Printf("APM Transaction detected: %s", tx.TraceContext().Trace)
+		} else {
+			log.Printf("No APM transaction found in context")
+		}
+
 		requestID := c.GetString("request_id")
 
 		var loginReq LoginRequest
@@ -273,6 +287,15 @@ func loginHandler(config *Config) gin.HandlerFunc {
 
 		log.Printf("Login attempt for user: %s (Request ID: %s)", loginReq.Username, requestID)
 
+		// Debug: Log distributed tracing headers
+		traceparent := c.GetHeader("traceparent")
+		tracestate := c.GetHeader("tracestate")
+		if traceparent != "" || tracestate != "" {
+			log.Printf("Distributed tracing headers - traceparent: %s, tracestate: %s", traceparent, tracestate)
+		} else {
+			log.Printf("No distributed tracing headers found in request")
+		}
+
 		// Prepare headers to forward to auth service
 		headers := map[string]string{
 			"X-Request-ID":    requestID,
@@ -281,8 +304,16 @@ func loginHandler(config *Config) gin.HandlerFunc {
 		}
 
 		// Call Python authentication service
-		authResp, err := callAuthService(config.AuthServiceURL, loginReq.Username, loginReq.Password, loginReq.ForceLogin, headers)
+		authResp, err := callAuthService(c.Request.Context(), config.AuthServiceURL, loginReq.Username, loginReq.Password, loginReq.ForceLogin, headers)
 		if err != nil {
+			// Create span for auth service error
+			span, _ := apm.StartSpan(c.Request.Context(), "auth_service_error", "app.external_service")
+			span.Context.SetLabel("username", loginReq.Username)
+			span.Context.SetLabel("error", err.Error())
+			span.Context.SetLabel("auth_service_url", config.AuthServiceURL)
+			span.Context.SetLabel("response_status", 500)
+			defer span.End()
+
 			log.Printf("Auth service error: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "auth_service_error",
@@ -293,6 +324,13 @@ func loginHandler(config *Config) gin.HandlerFunc {
 
 		// Check for session conflict
 		if authResp.SessionConflict && !loginReq.ForceLogin {
+			// Create span for session conflict handling
+			span, _ := apm.StartSpan(c.Request.Context(), "session_conflict_handling", "app.business_logic")
+			span.Context.SetLabel("username", loginReq.Username)
+			span.Context.SetLabel("conflict_reason", "existing_session")
+			span.Context.SetLabel("response_status", 409)
+			defer span.End()
+
 			log.Printf("Session conflict for user: %s", loginReq.Username)
 			c.JSON(http.StatusConflict, LoginResponse{
 				SessionConflict: true,
@@ -303,6 +341,13 @@ func loginHandler(config *Config) gin.HandlerFunc {
 
 		// Check authentication result
 		if !authResp.OK || authResp.UserID == nil {
+			// Create span for authentication failure
+			span, _ := apm.StartSpan(c.Request.Context(), "authentication_failure", "app.business_logic")
+			span.Context.SetLabel("username", loginReq.Username)
+			span.Context.SetLabel("failure_reason", "invalid_credentials")
+			span.Context.SetLabel("response_status", 401)
+			defer span.End()
+
 			log.Printf("Authentication failed for user: %s", loginReq.Username)
 			c.JSON(http.StatusUnauthorized, ErrorResponse{
 				Error:   "invalid_credentials",
@@ -321,6 +366,14 @@ func loginHandler(config *Config) gin.HandlerFunc {
 		}
 
 		if !hasValidRole {
+			// Create span for role validation failure
+			span, _ := apm.StartSpan(c.Request.Context(), "role_validation_failure", "app.business_logic")
+			span.Context.SetLabel("username", loginReq.Username)
+			span.Context.SetLabel("user_roles", fmt.Sprintf("%v", authResp.Roles))
+			span.Context.SetLabel("failure_reason", "insufficient_permissions")
+			span.Context.SetLabel("response_status", 403)
+			defer span.End()
+
 			log.Printf("User %s has no valid banking roles", loginReq.Username)
 			c.JSON(http.StatusForbidden, ErrorResponse{
 				Error:   "insufficient_permissions",
@@ -332,6 +385,14 @@ func loginHandler(config *Config) gin.HandlerFunc {
 		// Generate JWT token
 		token, err := generateJWT(*authResp.UserID, authResp.Roles, config.JWTSecret)
 		if err != nil {
+			// Create span for JWT generation failure
+			span, _ := apm.StartSpan(c.Request.Context(), "jwt_generation_failure", "app.business_logic")
+			span.Context.SetLabel("username", loginReq.Username)
+			span.Context.SetLabel("user_id", *authResp.UserID)
+			span.Context.SetLabel("error", err.Error())
+			span.Context.SetLabel("response_status", 500)
+			defer span.End()
+
 			log.Printf("Failed to generate JWT: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "token_generation_error",
@@ -342,7 +403,7 @@ func loginHandler(config *Config) gin.HandlerFunc {
 
 		// Create session record if session_id was provided
 		if authResp.SessionID != "" {
-			err = createSession(config.AuthServiceURL, *authResp.UserID, authResp.SessionID, token, c.ClientIP(), c.GetHeader("User-Agent"))
+			err = createSession(c.Request.Context(), config.AuthServiceURL, *authResp.UserID, authResp.SessionID, token, c.ClientIP(), c.GetHeader("User-Agent"))
 			if err != nil {
 				log.Printf("Failed to create session: %v", err)
 				// Continue anyway, session management is not critical for login
@@ -350,6 +411,15 @@ func loginHandler(config *Config) gin.HandlerFunc {
 		}
 
 		log.Printf("Successful login for user: %s (Request ID: %s)", loginReq.Username, requestID)
+
+		// Create span for successful login
+		span, _ := apm.StartSpan(c.Request.Context(), "successful_login", "app.business_logic")
+		span.Context.SetLabel("username", loginReq.Username)
+		span.Context.SetLabel("user_id", *authResp.UserID)
+		span.Context.SetLabel("roles", fmt.Sprintf("%v", authResp.Roles))
+		span.Context.SetLabel("response_status", 200)
+		span.Context.SetLabel("has_session", authResp.SessionID != "")
+		defer span.End()
 
 		// Return success response
 		c.JSON(http.StatusOK, LoginResponse{
@@ -395,6 +465,120 @@ func healthHandler(config *Config) gin.HandlerFunc {
 	}
 }
 
+// Logout handler
+func logoutHandler(config *Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		span, ctx := apm.StartSpan(c.Request.Context(), "user_logout", "app.business_logic")
+		defer span.End()
+
+		requestID := c.GetString("request_id")
+
+		var logoutReq LogoutRequest
+		if err := c.ShouldBindJSON(&logoutReq); err != nil {
+			span.Context.SetLabel("error", err.Error())
+			span.Context.SetLabel("response_status", 400)
+			log.Printf("Invalid logout request body: %v", err)
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "invalid_request",
+				Message: "Invalid request body",
+			})
+			return
+		}
+
+		log.Printf("Logout attempt for user: %s (Request ID: %s)", logoutReq.UserID, requestID)
+
+		// Prepare logout request for auth service
+		logoutData := map[string]interface{}{
+			"user_id":                logoutReq.UserID,
+			"terminate_all_sessions": logoutReq.TerminateAllSessions,
+		}
+
+		if logoutReq.SessionID != "" {
+			logoutData["session_id"] = logoutReq.SessionID
+		}
+
+		jsonData, err := json.Marshal(logoutData)
+		if err != nil {
+			span.Context.SetLabel("error", err.Error())
+			span.Context.SetLabel("response_status", 500)
+			log.Printf("Failed to marshal logout request: %v", err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "request_marshal_error",
+				Message: "Failed to prepare logout request",
+			})
+			return
+		}
+
+		// Call Python auth service logout endpoint
+		req, err := http.NewRequestWithContext(ctx, "POST", config.AuthServiceURL+"/logout", bytes.NewBuffer(jsonData))
+		if err != nil {
+			span.Context.SetLabel("error", err.Error())
+			span.Context.SetLabel("response_status", 500)
+			log.Printf("Failed to create logout request: %v", err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "request_creation_error",
+				Message: "Failed to create logout request",
+			})
+			return
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Request-ID", requestID)
+		req.Header.Set("X-Forwarded-For", c.ClientIP())
+		req.Header.Set("User-Agent", c.GetHeader("User-Agent"))
+
+		client := apmhttp.WrapClient(&http.Client{Timeout: 10 * time.Second})
+		resp, err := client.Do(req)
+		if err != nil {
+			span.Context.SetLabel("error", err.Error())
+			span.Context.SetLabel("response_status", 500)
+			log.Printf("Auth service logout error: %v", err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "auth_service_error",
+				Message: "Logout service unavailable",
+			})
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			span.Context.SetLabel("auth_service_status", resp.StatusCode)
+			span.Context.SetLabel("response_status", 500)
+			log.Printf("Auth service logout returned status: %d", resp.StatusCode)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "logout_failed",
+				Message: "Failed to terminate session",
+			})
+			return
+		}
+
+		var logoutResp map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&logoutResp); err != nil {
+			span.Context.SetLabel("error", err.Error())
+			span.Context.SetLabel("response_status", 500)
+			log.Printf("Failed to decode logout response: %v", err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "response_decode_error",
+				Message: "Failed to process logout response",
+			})
+			return
+		}
+
+		// Add success labels to span
+		span.Context.SetLabel("user_id", logoutReq.UserID)
+		span.Context.SetLabel("sessions_terminated", logoutResp["sessions_terminated"])
+		span.Context.SetLabel("response_status", 200)
+
+		log.Printf("Successful logout for user: %s (Request ID: %s)", logoutReq.UserID, requestID)
+
+		c.JSON(http.StatusOK, gin.H{
+			"success":             true,
+			"message":             "Logout successful",
+			"sessions_terminated": logoutResp["sessions_terminated"],
+		})
+	}
+}
+
 func main() {
 	config := loadConfig()
 
@@ -421,7 +605,7 @@ func main() {
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Api-Client, X-Request-ID")
+		c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Api-Client, X-Request-ID, traceparent, tracestate")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -442,6 +626,7 @@ func main() {
 
 		// Protected routes with header validation
 		api.POST("/login", validateHeaders(config.APIClient), loginHandler(config))
+		api.POST("/logout", validateHeaders(config.APIClient), logoutHandler(config))
 	}
 
 	port := config.Port

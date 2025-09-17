@@ -24,7 +24,7 @@
 | Command | Description |
 |---------|-------------|
 | `status` | Check status of all services |
-| `start` | Start all services (Docker + Frontend) |
+| `start` | Start all services (Docker containers) |
 | `stop` | Stop all services |
 | `restart` | Restart all services |
 | `clean` | Clean up all Docker images and containers |
@@ -32,13 +32,27 @@
 | `logs` | Show recent logs from all services |
 | `health` | Perform health checks on all endpoints |
 
-## Services
+## Container Services
 
-- **Frontend**: http://localhost:3001 (React App)
-- **Login API**: http://localhost:8000 (Go Gateway)
-- **Auth Service**: http://localhost:8001 (Python FastAPI)
-- **Accounts API**: http://localhost:8002 (Go Service)  
-- **Database**: localhost:5432 (PostgreSQL)
+All services run as Docker containers for consistent deployment:
+
+- **Frontend**: http://localhost:3000 (React App Container) [optional - use profile]  
+- **Login Gateway**: http://localhost:8000 (Go Service Container)
+- **Auth Service**: http://localhost:8001 (Python FastAPI Container)
+- **Accounts Service**: http://localhost:8002 (Go Service Container)
+- **PDF Service**: http://localhost:8003 (Java Spring Boot Container)
+- **Payee Service**: http://localhost:5004 (.NET Service Container)
+- **Database**: localhost:5432 (PostgreSQL Container)
+
+## Manual Frontend (Alternative)
+
+If you prefer running frontend locally:
+
+```bash
+cd frontend
+npm install
+npm start  # Runs on localhost:3001
+```
 
 ## Test Credentials
 
@@ -48,6 +62,18 @@
 | janedoe | password123 | retail |
 | corpuser | password123 | corporate |
 
+## Deployment Architecture
+
+All services are containerized using Docker Compose:
+
+```yaml
+# Start all backend services
+docker-compose up -d
+
+# Start with frontend container (optional)
+docker-compose --profile frontend up -d
+```
+
 ## Troubleshooting
 
 ### Services not starting?
@@ -56,41 +82,64 @@
 ./manage-services.sh install
 ```
 
-### Frontend connection issues?
+### Individual service rebuild?
 ```bash
-./manage-services.sh restart
-./manage-services.sh health
+# Rebuild specific service
+docker-compose build login-go-service
+docker-compose up login-go-service -d
 ```
 
 ### Check logs for errors?
 ```bash
 ./manage-services.sh logs
+# OR specific service
+docker-compose logs login-go-service --tail=20
 ```
 
-## Session Management Testing
+## Session Management & Logout
 
+### Complete Logout Flow
+1. Frontend calls `/api/logout` endpoint
+2. Go gateway forwards to Python auth service `/logout`
+3. Active sessions terminated in database  
+4. Frontend localStorage cleared
+5. User redirected to login page
+
+### Testing Session Management
 1. Login with any user
 2. Open new tab, try to login with same user  
 3. See session conflict dialog
 4. Click "Continue" to force login and terminate previous session
+5. Logout properly terminates all sessions (no more conflicts)
+
+## Observability Stack
+
+- **APM Server**: http://91.203.133.240:30200
+- **Backend Instrumentation**: Elastic APM Go agent on login service
+- **Frontend Monitoring**: Elastic RUM on all pages
+- **Distributed Tracing**: End-to-end trace correlation between frontend and backend
 
 ## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐
-│   Frontend      │───▶│  Go Login        │
-│   (React)       │    │  Service :8000   │
-│   :3001         │    └──────────────────┘
-└─────────────────┘             │
-                                ▼
-                    ┌──────────────────┐
-                    │  Python Auth     │
-                    │  Service :8001   │
-                    └──────────────────┘
-                                │
-                                ▼
-                    ┌──────────────────┐
-                    │  PostgreSQL      │
-                    │  Database :5432  │
+┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│   Frontend      │───▶│  Go Login        │───▶│  Python Auth     │
+│   (React)       │    │  Gateway :8000   │    │  Service :8001   │
+│   :3000/3001    │    └──────────────────┘    └──────────────────┘
+└─────────────────┘             │                       │
+                                │                       ▼
+                    ┌──────────────────┐    ┌──────────────────┐
+                    │  Go Accounts     │    │  PostgreSQL      │
+                    │  Service :8002   │    │  Database :5432  │
+                    └──────────────────┘    └──────────────────┘
+                                │                       ▲
+                    ┌──────────────────┐                │
+                    │  Java PDF        │                │
+                    │  Service :8003   │                │
+                    └──────────────────┘                │
+                                │                       │
+                    ┌──────────────────┐                │
+                    │  .NET Payee      │                │
+                    │  Service :5004   │────────────────┘
                     └──────────────────┘
 ```

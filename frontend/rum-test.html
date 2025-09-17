@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VuBank - RUM Test Page</title>
+    
+    <!-- Elastic RUM Agent -->
+    <script src="https://unpkg.com/@elastic/apm-rum@5.12.0/dist/bundles/elastic-apm-rum.umd.min.js" crossorigin></script>
+    <script>
+        // Initialize Elastic RUM
+        elasticApm.init({
+            serviceName: 'vubank-frontend',
+            serverUrl: 'http://91.203.133.240:30200',
+            serviceVersion: '1.0.0',
+            environment: 'production',
+            // Page-specific configuration
+            pageLoadTransactionName: 'rum-test-page-load',
+            // Additional configuration
+            distributedTracingOrigins: ['http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 'http://localhost:8003', 'http://localhost:5004'],
+            disableInstrumentations: [],
+            logLevel: 'info'
+        });
+        
+        // Set test user context
+        elasticApm.setUserContext({
+            id: 'test-user',
+            username: 'test-user',
+            email: 'test@vubank.com'
+        });
+        
+        elasticApm.addLabels({
+            page: 'rum-test',
+            component: 'test-page',
+            version: '1.0.0'
+        });
+        
+        // Track page load performance
+        window.addEventListener('load', function() {
+            const testTransaction = elasticApm.startTransaction('test-page-ready', 'page-load');
+            testTransaction.addLabels({
+                test_type: 'rum_validation',
+                timestamp: new Date().toISOString()
+            });
+            testTransaction.end();
+            
+            console.log('✅ RUM Test Page Loaded Successfully');
+            console.log('📊 RUM Agent Initialized:', elasticApm);
+        });
+    </script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #003d82 0%, #0066cc 50%, #4da6ff 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .test-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 600px;
+        }
+        
+        .test-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .test-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .rum-status {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .rum-config {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: left;
+            margin: 20px 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🏦 VuBank RUM Test Page</h1>
+        
+        <div class="rum-status">
+            <h3>✅ RUM Status: Active</h3>
+            <p>APM Server: <strong>http://91.203.133.240:30200</strong></p>
+            <p>Service Name: <strong>vubank-frontend</strong></p>
+            <p>Environment: <strong>production</strong></p>
+        </div>
+        
+        <div class="rum-config">
+            <h4>RUM Configuration:</h4>
+            <pre>
+Service Name: vubank-frontend
+APM Server: http://91.203.133.240:30200
+Service Version: 1.0.0
+Environment: production
+Distributed Tracing Origins:
+  - http://localhost:8000 (login-go-service)
+  - http://localhost:8001 (auth-service)
+  - http://localhost:8002 (accounts-service)
+  - http://localhost:8003 (pdf-service)
+  - http://localhost:5004 (payee-service)
+            </pre>
+        </div>
+        
+        <div>
+            <h3>Test RUM Events</h3>
+            <button class="test-button" onclick="testCustomTransaction()">Test Custom Transaction</button>
+            <button class="test-button" onclick="testError()">Test Error Capture</button>
+            <button class="test-button" onclick="testUserAction()">Test User Action</button>
+        </div>
+        
+        <div>
+            <p><a href="index.html" style="color: white;">← Back to Main App</a></p>
+        </div>
+    </div>
+    
+    <script>
+        function testCustomTransaction() {
+            const testTransaction = elasticApm.startTransaction('test-custom-transaction', 'user-action');
+            testTransaction.addLabels({
+                test_action: 'custom_transaction',
+                user_id: 'test-user',
+                timestamp: new Date().toISOString()
+            });
+            
+            // Simulate some work
+            setTimeout(() => {
+                testTransaction.addLabels({
+                    result: 'success',
+                    duration: '1000ms'
+                });
+                testTransaction.end();
+                alert('✅ Custom transaction sent to RUM!');
+            }, 1000);
+        }
+        
+        function testError() {
+            try {
+                // Intentionally throw an error
+                throw new Error('Test error for RUM validation');
+            } catch (error) {
+                elasticApm.captureError(error);
+                elasticApm.addLabels({
+                    error_test: 'intentional_error',
+                    error_time: new Date().toISOString()
+                });
+                alert('❌ Test error captured in RUM!');
+            }
+        }
+        
+        function testUserAction() {
+            const actionTransaction = elasticApm.startTransaction('test-user-action', 'user-interaction');
+            actionTransaction.addLabels({
+                action_type: 'button_click',
+                component: 'test_button',
+                user_id: 'test-user'
+            });
+            
+            // Simulate user action processing
+            const span = actionTransaction.startSpan('process-user-action', 'business-logic');
+            
+            setTimeout(() => {
+                span.addLabels({
+                    processing_result: 'success'
+                });
+                span.end();
+                actionTransaction.end();
+                alert('👤 User action tracked in RUM!');
+            }, 500);
+        }
+    </script>
+</body>
+</html>

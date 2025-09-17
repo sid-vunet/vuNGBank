@@ -10,6 +10,46 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Elastic RUM Agent -->
+    <script src="https://unpkg.com/@elastic/apm-rum@5.12.0/dist/bundles/elastic-apm-rum.umd.min.js" crossorigin></script>
+    <script>
+        // Initialize Elastic RUM
+        elasticApm.init({
+            serviceName: 'vubank-frontend',
+            serverUrl: 'http://91.203.133.240:30200',
+            serviceVersion: '1.0.0',
+            environment: 'production',
+            // Page-specific configuration
+            pageLoadTransactionName: 'dashboard-page-load',
+            // Additional configuration
+            distributedTracingOrigins: ['http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 'http://localhost:8003', 'http://localhost:5004'],
+            disableInstrumentations: [],
+            logLevel: 'info'
+        });
+        
+        // Set user context for authenticated user
+        const userData = JSON.parse(localStorage.getItem('vubank_user') || '{}');
+        if (userData.id) {
+            elasticApm.setUserContext({
+                id: userData.id,
+                username: userData.username,
+                email: `${userData.username}@vubank.com`
+            });
+        }
+        
+        elasticApm.addLabels({
+            page: 'dashboard',
+            component: 'main-dashboard',
+            version: '1.0.0',
+            user_roles: userData.roles ? userData.roles.join(',') : 'unknown'
+        });
+        
+        // Track page load performance
+        window.addEventListener('load', function() {
+            elasticApm.startTransaction('dashboard-ready', 'page-load');
+        });
+    </script>
+    
     <style>
         /* Base styles */
         * {
@@ -924,16 +964,96 @@
                 this.logoutModal.classList.remove('show');
             }
             
-            handleLogout() {
+            async handleLogout() {
                 // Hide modal
                 this.hideLogoutModal();
                 
-                // Clear stored authentication data
-                localStorage.removeItem('vubank_token');
-                localStorage.removeItem('vubank_user');
+                // Start RUM transaction for logout
+                const logoutTransaction = elasticApm.startTransaction('user-logout', 'user-interaction');
                 
-                // Redirect to login page
-                window.location.href = 'login.html';
+                try {
+                    const token = localStorage.getItem('vubank_token');
+                    const user = JSON.parse(localStorage.getItem('vubank_user') || '{}');
+                    
+                    if (token && user?.id) {
+                        // Start span for backend logout call
+                        const logoutSpan = elasticApm.startSpan('logout-api-call', 'http');
+                        
+                        try {
+                            // Call backend logout API to terminate sessions
+                            const apiUrl = 'http://localhost:5001'; // Login service URL
+                            
+                            const response = await fetch(`${apiUrl}/v1/logout`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Api-Client': 'web-portal',
+                                    'Authorization': `Bearer ${token}`,
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'Origin': window.location.origin
+                                },
+                                body: JSON.stringify({
+                                    user_id: user.id,
+                                    terminate_all_sessions: true
+                                })
+                            });
+                            
+                            if (logoutSpan) {
+                                logoutSpan.addLabels({
+                                    'http.status_code': response.status,
+                                    'user.id': user.id,
+                                    'logout.terminate_all': true
+                                });
+                            }
+                            
+                        } catch (apiError) {
+                            if (logoutSpan) {
+                                logoutSpan.addLabels({
+                                    'error': true,
+                                    'error.message': apiError.message
+                                });
+                            }
+                            throw apiError;
+                        } finally {
+                            if (logoutSpan) logoutSpan.end();
+                        }
+                    }
+                    
+                    // Add labels to transaction
+                    if (logoutTransaction) {
+                        logoutTransaction.addLabels({
+                            'user.id': user?.id || 'unknown',
+                            'user.username': user?.username || 'unknown',
+                            'logout.success': true,
+                            'page': 'dashboard'
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.error('Error during logout:', error);
+                    
+                    // Add error to transaction
+                    if (logoutTransaction) {
+                        logoutTransaction.addLabels({
+                            'logout.success': false,
+                            'error': true,
+                            'error.message': error.message
+                        });
+                        elasticApm.captureError(error);
+                    }
+                    
+                    // Continue with frontend logout even if backend call fails
+                } finally {
+                    // Clear stored authentication data regardless of API call result
+                    localStorage.removeItem('vubank_token');
+                    localStorage.removeItem('vubank_user');
+                    
+                    // End RUM transaction
+                    if (logoutTransaction) logoutTransaction.end();
+                    
+                    // Redirect to login page
+                    window.location.href = 'login.html';
+                }
             }
             
             async showBalance(accountIndex) {
