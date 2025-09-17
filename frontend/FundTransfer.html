@@ -416,6 +416,59 @@
             background: #dbeafe;
         }
 
+        /* Add Payee Modal Styles */
+        .bank-details {
+            margin-top: 8px;
+            padding: 12px;
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            border-radius: 6px;
+        }
+
+        .bank-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .bank-info span:first-child {
+            font-weight: 600;
+            color: #059669;
+        }
+
+        .bank-info span:last-child {
+            font-size: 14px;
+            color: #047857;
+        }
+
+        .validation-message {
+            margin-top: 4px;
+            font-size: 12px;
+            min-height: 16px;
+        }
+
+        .validation-message.success {
+            color: #059669;
+        }
+
+        .validation-message.error {
+            color: #dc2626;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: spin 0.8s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         .account-selector {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1078,10 +1131,80 @@
         </div>
     </div>
 
-    <!-- Add Payee Modal (will be implemented separately) -->
-    <!-- This would be a separate modal component for adding new payees -->
+    <!-- Add Payee Modal -->
+    <div class="modal" id="addPayeeModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Add New Payee</h2>
+                <button class="modal-close" onclick="hideAddPayeeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addPayeeForm" onsubmit="handleAddPayee(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="payeeName">Beneficiary Name</label>
+                        <input type="text" id="payeeName" class="form-input" required 
+                               placeholder="Enter beneficiary name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="payeeAccountNumber">Account Number</label>
+                        <input type="text" id="payeeAccountNumber" class="form-input" required 
+                               placeholder="Enter account number" pattern="[0-9]+" minlength="8" maxlength="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="payeeIfscCode">IFSC Code</label>
+                        <input type="text" id="payeeIfscCode" class="form-input" required 
+                               placeholder="Enter IFSC code (e.g., SBIN0000001)" 
+                               pattern="[A-Z]{4}0[A-Z0-9]{6}" maxlength="11" style="text-transform: uppercase">
+                        <div id="ifscValidationMessage" class="validation-message"></div>
+                        <div id="bankDetails" class="bank-details" style="display: none;">
+                            <div class="bank-info">
+                                <span id="bankName"></span>
+                                <span id="branchName"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="payeeAccountType">Account Type</label>
+                        <select id="payeeAccountType" class="form-input" required>
+                            <option value="">Select account type</option>
+                            <option value="Savings">Savings</option>
+                            <option value="Current">Current</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideAddPayeeModal()">Cancel</button>
+                <button type="submit" form="addPayeeForm" class="btn btn-primary" id="addPayeeSubmit">
+                    Add Payee
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
+        // Global functions for modal interaction
+        function hideAddPayeeModal() {
+            if (window.fundTransferManager) {
+                window.fundTransferManager.hideAddPayeeModal();
+            }
+        }
+
+        function handleAddPayee(event) {
+            if (window.fundTransferManager) {
+                window.fundTransferManager.handleAddPayee(event);
+            }
+        }
+
+        function showAddPayeeForm(query = '') {
+            if (window.fundTransferManager) {
+                window.fundTransferManager.showAddPayeeForm(query);
+            }
+        }
+
         class FundTransferManager {
             constructor() {
                 this.currentStep = 1;
@@ -1190,6 +1313,23 @@
                     input.addEventListener('input', (e) => this.handlePinInput(e, index));
                     input.addEventListener('keydown', (e) => this.handlePinKeydown(e, index));
                 });
+
+                // Add payee modal form IFSC validation
+                setTimeout(() => {
+                    const ifscInput = document.getElementById('payeeIfscCode');
+                    if (ifscInput) {
+                        ifscInput.addEventListener('input', (e) => {
+                            const ifscCode = e.target.value.toUpperCase();
+                            e.target.value = ifscCode;
+                            if (ifscCode.length === 11) {
+                                this.validateIfscCode(ifscCode);
+                            } else {
+                                document.getElementById('ifscValidationMessage').textContent = '';
+                                document.getElementById('bankDetails').style.display = 'none';
+                            }
+                        });
+                    }
+                }, 100);
             }
 
             async loadUserData() {
@@ -1296,15 +1436,57 @@
                 }
             }
 
-            loadPayees() {
-                // Mock payees data - In real app, this would come from API
-                this.payees = [
-                    { id: 1, name: 'John Doe', accountNumber: '1234567890', bankName: 'HDFC Bank' },
-                    { id: 2, name: 'Jane Smith', accountNumber: '9876543210', bankName: 'ICICI Bank' },
-                    { id: 3, name: 'Bob Johnson', accountNumber: '5555666677', bankName: 'SBI' },
-                    { id: 4, name: 'Alice Brown', accountNumber: '1111222233', bankName: 'Axis Bank' },
-                    { id: 5, name: 'Charlie Wilson', accountNumber: '7777888899', bankName: 'Kotak Bank' }
-                ];
+            async loadPayees() {
+                try {
+                    // Load payees from API instead of hardcoded data
+                    await this.loadPayeesFromAPI();
+                } catch (error) {
+                    console.error('Error loading payees:', error);
+                    // Fallback to empty array if API fails
+                    this.payees = [];
+                }
+            }
+
+            async loadPayeesFromAPI() {
+                try {
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        console.warn('No authentication token found');
+                        this.payees = [];
+                        return;
+                    }
+
+                    const response = await fetch('http://localhost:5004/api/payees', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const payeesData = await response.json();
+                    
+                    // Transform API response to match frontend format
+                    this.payees = payeesData.map(payee => ({
+                        id: payee.id,
+                        name: payee.beneficiaryName,
+                        accountNumber: payee.accountNumber,
+                        bankName: payee.bankName,
+                        branchName: payee.branchName,
+                        ifscCode: payee.ifscCode,
+                        accountType: payee.accountType
+                    }));
+
+                    console.log(`Loaded ${this.payees.length} payees from API`);
+                } catch (error) {
+                    console.error('Error fetching payees from API:', error);
+                    this.payees = [];
+                    throw error;
+                }
             }
 
             handlePayeeSearch(query) {
@@ -1332,6 +1514,7 @@
                     item.innerHTML = `
                         <div style="font-weight: 600;">${payee.name}</div>
                         <div style="font-size: 12px; color: #6b7280;">${payee.accountNumber} - ${payee.bankName}</div>
+                        <div style="font-size: 11px; color: #9ca3af;">${payee.branchName} (${payee.ifscCode})</div>
                     `;
                     item.onclick = () => this.selectPayee(payee);
                     this.payeeSuggestions.appendChild(item);
@@ -1399,9 +1582,176 @@
             }
 
             showAddPayeeForm(query = '') {
-                // This would open a modal to add a new payee
-                // For now, we'll just show an alert
-                alert(`Add Payee functionality would open here${query ? ` for "${query}"` : ''}`);
+                const modal = document.getElementById('addPayeeModal');
+                const nameInput = document.getElementById('payeeName');
+                
+                // Pre-fill name if query was provided
+                if (query) {
+                    nameInput.value = query;
+                }
+                
+                modal.classList.add('show');
+            }
+
+            async validateIfscCode(ifscCode) {
+                const validationMessage = document.getElementById('ifscValidationMessage');
+                const bankDetails = document.getElementById('bankDetails');
+                const bankName = document.getElementById('bankName');
+                const branchName = document.getElementById('branchName');
+                
+                if (ifscCode.length !== 11) {
+                    validationMessage.textContent = 'IFSC code must be 11 characters long';
+                    validationMessage.className = 'validation-message error';
+                    bankDetails.style.display = 'none';
+                    return false;
+                }
+
+                // Show loading
+                validationMessage.innerHTML = '<span class="loading-spinner"></span> Validating IFSC code...';
+                validationMessage.className = 'validation-message';
+
+                try {
+                    const response = await fetch(`https://ifsc.razorpay.com/${ifscCode.toUpperCase()}`);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        bankName.textContent = data.BANK || 'Unknown Bank';
+                        branchName.textContent = data.BRANCH || 'Unknown Branch';
+                        bankDetails.style.display = 'block';
+                        validationMessage.textContent = 'Valid IFSC code';
+                        validationMessage.className = 'validation-message success';
+                        return true;
+                    } else {
+                        throw new Error('Invalid IFSC code');
+                    }
+                } catch (error) {
+                    validationMessage.textContent = 'Invalid IFSC code';
+                    validationMessage.className = 'validation-message error';
+                    bankDetails.style.display = 'none';
+                    return false;
+                }
+            }
+
+            async addPayeeToAPI(payeeData) {
+                try {
+                    const token = localStorage.getItem('token');
+                    if (!token) {
+                        throw new Error('No authentication token found');
+                    }
+
+                    const response = await fetch('http://localhost:5004/api/payees', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payeeData)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error adding payee:', error);
+                    throw error;
+                }
+            }
+
+            async handleAddPayee(event) {
+                event.preventDefault();
+                
+                const submitBtn = document.getElementById('addPayeeSubmit');
+                const originalText = submitBtn.textContent;
+                
+                try {
+                    // Disable button and show loading
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="loading-spinner"></span> Adding...';
+                    
+                    const formData = new FormData(event.target);
+                    const beneficiaryName = document.getElementById('payeeName').value;
+                    const accountNumber = document.getElementById('payeeAccountNumber').value;
+                    const ifscCode = document.getElementById('payeeIfscCode').value.toUpperCase();
+                    const accountType = document.getElementById('payeeAccountType').value;
+                    
+                    // Validate IFSC code first
+                    const isValidIfsc = await this.validateIfscCode(ifscCode);
+                    if (!isValidIfsc) {
+                        throw new Error('Please enter a valid IFSC code');
+                    }
+                    
+                    const payeeData = {
+                        beneficiaryName,
+                        accountNumber,
+                        ifscCode,
+                        accountType
+                    };
+                    
+                    // Add payee via API
+                    const newPayee = await this.addPayeeToAPI(payeeData);
+                    
+                    // Add to local payees array
+                    this.payees.push({
+                        id: newPayee.id,
+                        name: newPayee.beneficiaryName,
+                        accountNumber: newPayee.accountNumber,
+                        bankName: newPayee.bankName,
+                        branchName: newPayee.branchName,
+                        ifscCode: newPayee.ifscCode,
+                        accountType: newPayee.accountType
+                    });
+                    
+                    // Close modal and reset form
+                    this.hideAddPayeeModal();
+                    
+                    // Show success message
+                    this.showSuccessMessage(`Payee "${beneficiaryName}" added successfully!`);
+                    
+                } catch (error) {
+                    console.error('Error adding payee:', error);
+                    alert(`Error adding payee: ${error.message}`);
+                } finally {
+                    // Reset button
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            }
+
+            hideAddPayeeModal() {
+                const modal = document.getElementById('addPayeeModal');
+                modal.classList.remove('show');
+                
+                // Reset form
+                document.getElementById('addPayeeForm').reset();
+                document.getElementById('ifscValidationMessage').textContent = '';
+                document.getElementById('bankDetails').style.display = 'none';
+            }
+
+            showSuccessMessage(message) {
+                // Create and show a temporary success message
+                const successDiv = document.createElement('div');
+                successDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #10b981;
+                    color: white;
+                    padding: 16px 24px;
+                    border-radius: 8px;
+                    z-index: 10000;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    font-weight: 600;
+                `;
+                successDiv.textContent = message;
+                document.body.appendChild(successDiv);
+                
+                // Remove after 3 seconds
+                setTimeout(() => {
+                    document.body.removeChild(successDiv);
+                }, 3000);
             }
 
             selectAccount(accountType) {
@@ -1493,6 +1843,14 @@
                     <div class="detail-row">
                         <span class="detail-label">Bank:</span>
                         <span class="detail-value">${this.selectedPayee.bankName}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Branch:</span>
+                        <span class="detail-value">${this.selectedPayee.branchName}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">IFSC Code:</span>
+                        <span class="detail-value">${this.selectedPayee.ifscCode}</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Transfer From:</span>

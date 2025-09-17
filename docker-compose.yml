@@ -59,6 +59,9 @@ services:
       ACCOUNTS_SERVICE_URL: http://accounts-go-service:8002
       JWT_SECRET: vubank-super-secret-jwt-key-2023
       API_CLIENT: web-portal
+      ELASTIC_APM_SERVER_URL: http://91.203.133.240:30200
+      ELASTIC_APM_SERVICE_NAME: vubank-login-service
+      ELASTIC_APM_ENVIRONMENT: production
     ports:
       - "8000:8000"
     depends_on:
@@ -114,6 +117,29 @@ services:
       - vubank-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/api/pdf/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # .NET Payee Store Service
+  payee-store-dotnet-service:
+    build:
+      context: ./backend/services/payee-store-dotnet-service
+      dockerfile: Dockerfile
+    container_name: payee-store-dotnet-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=vubank-postgres;Port=5432;Database=vubank_db;Username=vubank_user;Password=vubank_pass;"
+      JWT_SECRET: vubank-super-secret-jwt-key-2023
+    ports:
+      - "5004:5004"
+    depends_on:
+      vubank-postgres:
+        condition: service_healthy
+    networks:
+      - vubank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/api/health"]
       interval: 15s
       timeout: 10s
       retries: 5

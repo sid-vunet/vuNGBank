@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"go.elastic.co/apm/module/apmgin/v2"
+	"go.elastic.co/apm/module/apmhttp/v2"
+	"go.elastic.co/apm/v2"
 )
 
 // Config struct
@@ -21,6 +25,8 @@ type Config struct {
 	AccountsServiceURL string
 	JWTSecret          string
 	APIClient          string
+	APMServerURL       string
+	APMServiceName     string
 }
 
 // Request/Response models
@@ -78,6 +84,8 @@ func loadConfig() *Config {
 		AccountsServiceURL: getEnv("ACCOUNTS_SERVICE_URL", "http://accounts-go-service:8002"),
 		JWTSecret:          getEnv("JWT_SECRET", "your-super-secret-jwt-key"),
 		APIClient:          getEnv("API_CLIENT", "web-portal"),
+		APMServerURL:       getEnv("ELASTIC_APM_SERVER_URL", ""),
+		APMServiceName:     getEnv("ELASTIC_APM_SERVICE_NAME", "vubank-login-service"),
 	}
 }
 
@@ -148,6 +156,9 @@ func correlationID() gin.HandlerFunc {
 
 // Call Python authentication service
 func callAuthService(authURL string, username, password string, forceLogin bool, headers map[string]string) (*AuthResponse, error) {
+	span, ctx := apm.StartSpan(context.Background(), "callAuthService", "external.http")
+	defer span.End()
+
 	authReq := AuthRequest{
 		Username:   username,
 		Password:   password,
@@ -159,7 +170,7 @@ func callAuthService(authURL string, username, password string, forceLogin bool,
 		return nil, fmt.Errorf("failed to marshal auth request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", authURL+"/verify", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", authURL+"/verify", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -171,7 +182,7 @@ func callAuthService(authURL string, username, password string, forceLogin bool,
 		req.Header.Set(key, value)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := apmhttp.WrapClient(&http.Client{Timeout: 10 * time.Second})
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call auth service: %w", err)
@@ -192,6 +203,9 @@ func callAuthService(authURL string, username, password string, forceLogin bool,
 
 // Create session in auth service
 func createSession(authURL, userID, sessionID, jwtToken, ipAddress, userAgent string) error {
+	span, ctx := apm.StartSpan(context.Background(), "createSession", "external.http")
+	defer span.End()
+
 	sessionReq := map[string]interface{}{
 		"user_id":    userID,
 		"session_id": sessionID,
@@ -205,14 +219,14 @@ func createSession(authURL, userID, sessionID, jwtToken, ipAddress, userAgent st
 		return fmt.Errorf("failed to marshal session request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", authURL+"/create-session", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", authURL+"/create-session", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create session request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := apmhttp.WrapClient(&http.Client{Timeout: 10 * time.Second})
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to call session service: %w", err)
@@ -352,8 +366,13 @@ func loginHandler(config *Config) gin.HandlerFunc {
 // Health check handler
 func healthHandler(config *Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		span, ctx := apm.StartSpan(c.Request.Context(), "healthCheck", "app.health")
+		defer span.End()
+
 		// Check auth service health
-		resp, err := http.Get(config.AuthServiceURL + "/health")
+		client := apmhttp.WrapClient(&http.Client{Timeout: 5 * time.Second})
+		req, _ := http.NewRequestWithContext(ctx, "GET", config.AuthServiceURL+"/health", nil)
+		resp, err := client.Do(req)
 		authHealthy := err == nil && resp.StatusCode == http.StatusOK
 		if resp != nil {
 			resp.Body.Close()
@@ -379,12 +398,24 @@ func healthHandler(config *Config) gin.HandlerFunc {
 func main() {
 	config := loadConfig()
 
+	// Initialize APM if server URL is provided
+	if config.APMServerURL != "" {
+		log.Printf("Initializing APM with server: %s", config.APMServerURL)
+		// APM configuration is handled via environment variables
+		// ELASTIC_APM_SERVER_URL and ELASTIC_APM_SERVICE_NAME
+	}
+
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
+
+	// Add APM middleware if APM is configured
+	if config.APMServerURL != "" {
+		r.Use(apmgin.Middleware(r))
+	}
 
 	// Add CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -417,6 +448,10 @@ func main() {
 	log.Printf("Starting VuBank Login Gateway Service on port %s", port)
 	log.Printf("Auth Service URL: %s", config.AuthServiceURL)
 	log.Printf("API Client: %s", config.APIClient)
+	if config.APMServerURL != "" {
+		log.Printf("APM Server: %s", config.APMServerURL)
+		log.Printf("APM Service Name: %s", config.APMServiceName)
+	}
 
 	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
