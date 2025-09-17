@@ -236,3 +236,133 @@
 - **Debugging**: Quick issue identification
 - **Deployment**: Ready/not-ready status
 - **Load Balancing**: Health-based routing
+
+### ADR-008: Java Spring Boot for PDF Service
+**Decision**: Use Java with Spring Boot and iText 7 library for PDF receipt generation.
+
+**Context**: Need professional PDF document generation for banking transaction receipts.
+
+**Options Considered**:
+- Node.js with PDFKit
+- Python with ReportLab
+- Java with iText
+- Go with existing PDF libraries
+
+**Decision Rationale**:
+- **Professional Output**: iText provides enterprise-grade PDF generation
+- **Spring Boot**: Mature framework with excellent container support
+- **Banking Standards**: Java ecosystem widely used in financial services
+- **Rich Features**: Advanced PDF features like digital signatures, forms
+- **Documentation**: Comprehensive iText documentation and examples
+
+**Consequences**:
+- ✅ Professional, bank-quality PDF receipts
+- ✅ Excellent containerization with multi-stage Docker builds
+- ✅ Spring Boot actuator for health monitoring
+- ✅ CORS support for frontend integration
+- ❌ Additional JVM overhead compared to lighter alternatives
+- ❌ Java build complexity compared to interpreted languages
+
+### ADR-009: HTML Frontend over React
+**Decision**: Use vanilla HTML, CSS, and JavaScript instead of React framework.
+
+**Context**: Need banking interface that's lightweight and matches VuBank design patterns.
+
+**Options Considered**:
+- React single-page application
+- Vue.js framework
+- Angular framework  
+- Vanilla HTML/CSS/JavaScript
+
+**Decision Rationale**:
+- **Simplicity**: No build pipeline or complex tooling
+- **Performance**: Direct browser execution without framework overhead
+- **Control**: Complete control over DOM manipulation and styling
+- **Banking UX**: Traditional page-based navigation matches banking expectations
+- **Maintenance**: Easier to understand and modify without framework abstractions
+
+**Consequences**:
+- ✅ Lightweight and fast loading
+- ✅ No build step required for development
+- ✅ Complete styling control for VuBank branding
+- ✅ Traditional banking UX patterns
+- ❌ Manual DOM manipulation and state management
+- ❌ No built-in routing or component reusability
+
+### ADR-010: Multi-Step Fund Transfer UI
+**Decision**: Implement fund transfer as a 5-step guided process with client-side validation.
+
+**Context**: Need intuitive fund transfer experience that matches banking industry standards.
+
+**Options Considered**:
+- Single-page form with all fields visible
+- Multi-step wizard with progressive disclosure
+- Modal-based transfer process
+- Separate pages for each step
+
+**Decision Rationale**:
+- **User Experience**: Progressive disclosure reduces cognitive load
+- **Validation**: Step-by-step validation provides immediate feedback
+- **Banking Standards**: Matches industry-standard transfer workflows
+- **Error Recovery**: Easy navigation back to fix issues
+- **Mobile Friendly**: Better experience on smaller screens
+
+**Consequences**:
+- ✅ Intuitive user experience with clear progress indicators
+- ✅ Real-time validation at each step
+- ✅ Reduced user errors through guided process
+- ✅ Professional banking interface matching industry standards
+- ❌ More complex state management than single form
+- ❌ Additional JavaScript code for step navigation
+
+### ADR-011: Client-Side Transfer Processing
+**Decision**: Implement transfer processing as simulated client-side workflow with real PDF generation.
+
+**Context**: Need complete fund transfer demonstration without full backend implementation.
+
+**Options Considered**:
+- Full backend implementation with database transactions
+- Mock API server with simulated responses
+- Client-side simulation with real PDF generation
+- Static demo without actual processing
+
+**Decision Rationale**:
+- **Demonstration Value**: Complete user experience without backend complexity
+- **PDF Integration**: Real PDF service demonstrates microservices architecture
+- **Development Speed**: Faster implementation for proof of concept
+- **User Testing**: Full workflow available for user experience testing
+- **Architecture Ready**: Easy migration to full backend when needed
+
+**Consequences**:
+- ✅ Complete user experience for demonstration
+- ✅ Real PDF receipt generation
+- ✅ Realistic processing times and feedback
+- ✅ Easy migration path to full backend
+- ❌ No actual money transfer (demonstration only)
+- ❌ No persistent transaction history
+
+### ADR-012: PIN-Based Transfer Authorization
+**Decision**: Use 4-digit PIN for transfer authorization with client-side validation.
+
+**Context**: Need secure authorization method for fund transfers that's user-friendly.
+
+**Options Considered**:
+- Password re-entry for transfers
+- 4-digit PIN authorization
+- Biometric authentication (not available in browser)
+- Two-factor authentication via SMS
+
+**Decision Rationale**:
+- **Banking Standard**: 4-digit PINs widely used in banking
+- **User Experience**: Quick and familiar authorization method
+- **Security**: Additional layer beyond login authentication
+- **Implementation**: Simple client-side validation for demonstration
+- **Mobile Friendly**: Easy PIN entry on mobile devices
+
+**Consequences**:
+- ✅ Familiar banking authorization pattern
+- ✅ Quick and easy user experience
+- ✅ Additional security layer for transfers
+- ✅ Mobile-friendly interface
+- ❌ Client-side validation only (demo limitation)
+- ❌ No actual PIN encryption (would need backend implementation)

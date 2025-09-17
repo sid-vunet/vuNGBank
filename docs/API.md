@@ -2,10 +2,11 @@
 
 ## Overview
 
-The VuBank API is organized into three main services:
+The VuBank API is organized into four main services:
 - **Login Gateway Service** (Port 8000): Public authentication and JWT token management
 - **Authentication Service** (Port 8001): Internal credential verification and session management
 - **Accounts Service** (Port 8002): Protected account and transaction data
+- **PDF Receipt Service** (Port 8003): Professional PDF receipt generation
 
 All APIs follow REST principles with JSON request/response bodies and standard HTTP status codes.
 
@@ -16,11 +17,13 @@ Development Environment:
 - Login Gateway:    http://localhost:8000
 - Auth Service:     http://localhost:8001  (Internal)
 - Accounts Service: http://localhost:8002  (Internal)
+- PDF Service:      http://localhost:8003
 
 Production Environment:
 - Login Gateway:    https://api.vubank.com
 - Auth Service:     http://auth-service:8001  (Internal)
 - Accounts Service: http://accounts-service:8002  (Internal)
+- PDF Service:      http://pdf-service:8003  (Internal)
 ```
 
 ## Authentication Flow
@@ -411,6 +414,385 @@ Accounts service health check.
 }
 ```
 
+## PDF Receipt Service (Port 8003)
+
+### JWT Authentication Required
+All requests must include valid JWT token or can be accessed directly for testing:
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+Origin: http://localhost:3001
+```
+
+### PDF Generation Endpoints
+
+#### POST /api/pdf/generate-receipt
+Generate professional PDF receipt for banking transactions.
+
+**Request:**
+```http
+POST /api/pdf/generate-receipt
+Content-Type: application/json
+Origin: http://localhost:3001
+
+{
+  "transaction": {
+    "transactionId": "TXN202501150001",
+    "transactionDate": "2025-01-15T10:30:00Z",
+    "amount": 1500.00,
+    "currency": "USD",
+    "type": "Fund Transfer",
+    "description": "Transfer to John Smith",
+    "referenceNumber": "REF001234567890"
+  },
+  "fromAccount": {
+    "accountNumber": "1001234567890",
+    "accountName": "Jane Doe - Savings",
+    "accountType": "savings"
+  },
+  "toAccount": {
+    "accountNumber": "1001234567891", 
+    "accountName": "John Smith",
+    "accountType": "checking"
+  },
+  "user": {
+    "name": "Jane Doe",
+    "userId": "janedoe"
+  }
+}
+```
+
+**Request Body Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| transaction.transactionId | string | ✅ | Unique transaction identifier |
+| transaction.transactionDate | string | ✅ | ISO 8601 timestamp |
+| transaction.amount | number | ✅ | Transaction amount |
+| transaction.currency | string | ✅ | 3-letter currency code |
+| transaction.type | string | ✅ | Transaction type description |
+| transaction.description | string | ✅ | Transaction description |
+| transaction.referenceNumber | string | ✅ | Unique reference number |
+| fromAccount.accountNumber | string | ✅ | Source account number |
+| fromAccount.accountName | string | ✅ | Source account display name |
+| fromAccount.accountType | string | ✅ | Source account type |
+| toAccount.accountNumber | string | ✅ | Destination account number |
+| toAccount.accountName | string | ✅ | Destination account name |
+| toAccount.accountType | string | ✅ | Destination account type |
+| user.name | string | ✅ | User's display name |
+| user.userId | string | ✅ | User's login ID |
+
+**Success Response (200):**
+```
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="transaction_receipt_TXN202501150001.pdf"
+
+[PDF Binary Data]
+```
+
+**Error Responses:**
+
+| Status | Error Code | Description |
+|--------|------------|-------------|
+| 400 | invalid_request | Missing required transaction data |
+| 400 | invalid_format | Invalid date format or numeric values |
+| 500 | pdf_generation_error | Failed to generate PDF document |
+| 500 | server_error | Internal server error |
+
+**Example Error Response:**
+```json
+{
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "status": 400,
+  "error": "Bad Request", 
+  "message": "Missing required field: transaction.transactionId",
+  "path": "/api/pdf/generate-receipt"
+}
+```
+
+#### GET /api/pdf/health
+Check PDF service health status.
+
+**Request:**
+```http
+GET /api/pdf/health
+```
+
+**Success Response (200):**
+```json
+{
+  "status": "healthy",
+  "service": "PDF Receipt Generator",
+  "version": "1.0.0",
+  "timestamp": "2025-01-15T10:30:00.000Z"
+}
+```
+
+**Unhealthy Response (503):**
+```json
+{
+  "status": "unhealthy",
+  "service": "PDF Receipt Generator",
+  "error": "iText library initialization failed",
+  "timestamp": "2025-01-15T10:30:00.000Z"
+}
+```
+
+#### GET /actuator/health
+Spring Boot actuator health endpoint for comprehensive health monitoring.
+
+**Success Response (200):**
+```json
+{
+  "status": "UP",
+  "components": {
+    "diskSpace": {
+      "status": "UP",
+      "details": {
+        "total": 250685575168,
+        "free": 100685575168,
+        "threshold": 10485760
+      }
+    },
+    "ping": {
+      "status": "UP"
+    }
+  }
+}
+```
+
+### PDF Service Features
+- **Professional Layout**: Bank-branded PDF receipts with logo and styling
+- **Transaction Details**: Complete transaction information with timestamps
+- **Account Information**: Source and destination account details
+- **Security Elements**: Unique reference numbers and transaction IDs
+- **Download Ready**: PDF optimized for download and printing
+- **Cross-Origin Support**: CORS enabled for frontend integration
+
+## Fund Transfer System
+
+The fund transfer functionality is implemented as a complete frontend workflow with simulated backend processing. While the current implementation focuses on client-side validation and user experience, the architecture supports full backend integration.
+
+### Frontend Fund Transfer Endpoints
+
+#### Frontend Processing Flow
+The fund transfer system operates through a multi-step frontend process:
+
+1. **Step 1**: Transfer details and account selection
+2. **Step 2**: Payee management and selection
+3. **Step 3**: Confirmation and PIN verification
+4. **Step 4**: Transaction processing (simulated)
+5. **Step 5**: Receipt generation via PDF service
+
+### Simulated Transaction Processing
+
+#### POST /api/transactions/transfer (Planned)
+**Note**: This endpoint represents the planned backend implementation for actual transaction processing.
+
+**Request Structure:**
+```json
+{
+  "fromAccount": {
+    "accountNumber": "1001234567890",
+    "accountType": "savings"
+  },
+  "toAccount": {
+    "accountNumber": "1001234567891", 
+    "accountType": "checking"
+  },
+  "amount": 1500.00,
+  "currency": "USD",
+  "description": "Transfer to John Smith",
+  "payee": {
+    "id": "payee_001",
+    "name": "John Smith",
+    "nickname": "John - Checking"
+  },
+  "pin": "1234",
+  "referenceNumber": "REF001234567890"
+}
+```
+
+**Expected Response (200):**
+```json
+{
+  "transaction": {
+    "transactionId": "TXN202501150001",
+    "transactionDate": "2025-01-15T10:30:00Z",
+    "status": "completed",
+    "amount": 1500.00,
+    "currency": "USD",
+    "type": "Fund Transfer",
+    "description": "Transfer to John Smith",
+    "referenceNumber": "REF001234567890"
+  },
+  "fromAccountBalance": 23500.50,
+  "toAccountBalance": 7000.75,
+  "processingTime": "00:00:03"
+}
+```
+
+### Frontend Validation Endpoints
+
+#### Client-Side Payee Management
+The payee management system includes:
+
+**Payee Search (Frontend)**:
+```javascript
+// Frontend payee search implementation
+const searchPayees = (query) => {
+  const mockPayees = [
+    {
+      id: "payee_001",
+      name: "John Smith",
+      accountNumber: "1001234567891",
+      bankName: "VuBank", 
+      accountType: "checking",
+      nickname: "John - Checking",
+      verified: true
+    },
+    // Additional mock payees...
+  ]
+  
+  return mockPayees.filter(payee => 
+    payee.name.toLowerCase().includes(query.toLowerCase()) ||
+    payee.nickname.toLowerCase().includes(query.toLowerCase())
+  )
+}
+```
+
+**Account Validation (Frontend)**:
+```javascript
+// Frontend account validation
+const validateTransfer = (transferData) => {
+  const validations = {
+    amount: validateAmount(transferData.amount, transferData.fromAccountBalance),
+    accounts: validateAccounts(transferData.fromAccount, transferData.toAccount),
+    payee: validatePayee(transferData.payee),
+    pin: validatePIN(transferData.pin)
+  }
+  
+  return {
+    isValid: Object.values(validations).every(Boolean),
+    errors: Object.entries(validations)
+      .filter(([key, valid]) => !valid)
+      .map(([key]) => key)
+  }
+}
+```
+
+### Integration with Existing Services
+
+#### Account Balance Integration
+Fund transfers integrate with the existing accounts service:
+
+```javascript
+// Frontend integration with accounts service
+const getAccountBalances = async () => {
+  const response = await fetch('/api/accounts', {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+      'Origin': 'http://localhost:3001',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-Api-Client': 'web-portal'
+    }
+  })
+  
+  const data = await response.json()
+  return data.accounts
+}
+```
+
+#### PDF Receipt Integration
+Transaction receipts are generated via the PDF service:
+
+```javascript
+// PDF receipt generation for transfers
+const generateTransferReceipt = async (transferData) => {
+  const receiptData = {
+    transaction: {
+      transactionId: transferData.transactionId,
+      transactionDate: new Date().toISOString(),
+      amount: transferData.amount,
+      currency: "USD",
+      type: "Fund Transfer", 
+      description: transferData.description,
+      referenceNumber: transferData.referenceNumber
+    },
+    fromAccount: transferData.fromAccount,
+    toAccount: transferData.toAccount,
+    user: transferData.user
+  }
+  
+  const response = await fetch('http://localhost:8003/api/pdf/generate-receipt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(receiptData)
+  })
+  
+  return response.blob() // PDF file for download
+}
+```
+
+### Future Backend Implementation
+
+#### Planned Database Schema
+```sql
+-- Planned tables for full backend implementation
+CREATE TABLE payees (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  name VARCHAR(100) NOT NULL,
+  account_number VARCHAR(20) NOT NULL,
+  bank_name VARCHAR(100) NOT NULL,
+  account_type VARCHAR(20) NOT NULL,
+  nickname VARCHAR(100),
+  verified BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_used TIMESTAMP
+);
+
+CREATE TABLE transfers (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  from_account_id INTEGER REFERENCES accounts(id),
+  to_account_id INTEGER REFERENCES accounts(id),
+  payee_id INTEGER REFERENCES payees(id),
+  amount DECIMAL(15,2) NOT NULL,
+  currency VARCHAR(3) DEFAULT 'USD',
+  description TEXT,
+  reference_number VARCHAR(50) UNIQUE,
+  transaction_id VARCHAR(50) UNIQUE,
+  status VARCHAR(20) DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP
+);
+```
+
+#### Planned API Endpoints
+- `POST /api/payees` - Add new payee
+- `GET /api/payees` - Get user's payees
+- `PUT /api/payees/:id` - Update payee information
+- `DELETE /api/payees/:id` - Remove payee
+- `POST /api/transfers` - Process fund transfer
+- `GET /api/transfers/:id` - Get transfer details
+- `GET /api/transfers` - Get transfer history
+
+### Security Considerations
+
+#### Frontend Security
+- **PIN Validation**: Client-side PIN format validation
+- **Amount Limits**: Maximum transfer amount enforcement
+- **Session Validation**: JWT token validation for all operations
+- **Input Sanitization**: XSS protection on user inputs
+
+#### Planned Backend Security
+- **Database Transactions**: ACID compliance for fund transfers
+- **Audit Logging**: Complete transfer audit trail
+- **PIN Encryption**: Secure PIN storage and validation
+- **Rate Limiting**: Transfer frequency and amount limits
+- **Fraud Detection**: Suspicious pattern detection
+
 ## Error Handling
 
 ### Standard Error Response Format
@@ -550,6 +932,39 @@ curl -X GET http://localhost:8002/internal/accounts \
   -H "Origin: http://localhost:3001" \
   -H "X-Requested-With: XMLHttpRequest" \
   -H "X-Api-Client: web-portal"
+```
+
+6. **Generate PDF Receipt (Optional):**
+```bash
+curl -X POST http://localhost:8003/api/pdf/generate-receipt \
+  -H "Content-Type: application/json" \
+  -H "Origin: http://localhost:3001" \
+  -d '{
+    "transaction": {
+      "transactionId": "TXN202501150001",
+      "transactionDate": "2025-01-15T10:30:00Z",
+      "amount": 1500.00,
+      "currency": "USD",
+      "type": "Fund Transfer",
+      "description": "Transfer to John Smith",
+      "referenceNumber": "REF001234567890"
+    },
+    "fromAccount": {
+      "accountNumber": "1001234567890",
+      "accountName": "Jane Doe - Savings",
+      "accountType": "savings"
+    },
+    "toAccount": {
+      "accountNumber": "1001234567891",
+      "accountName": "John Smith", 
+      "accountType": "checking"
+    },
+    "user": {
+      "name": "Jane Doe",
+      "userId": "janedoe"
+    }
+  }' \
+  --output transaction_receipt.pdf
 ```
 
 ### Test User Credentials

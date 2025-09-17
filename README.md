@@ -2,14 +2,28 @@
 
 A full-stack banking simulation platform that mimics VuBank's Straight2Bank interface and operations using synthetic data.
 
+# VuBank NextGen Banking Platform
+
+A comprehensive banking simulation platform that replicates VuBank's Straight2Bank interface using modern web technologies and microservices architecture with synthetic data.
+
 ## Project Structure
 
 ```
 vuNGBank/
-├── frontend/          # React-based frontend application
-├── backend/           # Node.js/Express API server
-├── docs/              # Comprehensive project documentation
-└── .github/          # GitHub configuration
+├── frontend/          # HTML/CSS/JS banking interface
+├── backend/           # Microservices architecture
+│   ├── services/      # Individual service implementations
+│   │   ├── login-go-service/           # Go API Gateway (8000)
+│   │   ├── login-python-authenticator/ # Python Auth Service (8001)
+│   │   ├── accounts-go-service/        # Go Accounts Service (8002)
+│   │   └── pdf-receipt-java-service/   # Java PDF Service (8003)
+│   ├── db/           # Database initialization scripts
+│   └── index.js      # Node.js coordination layer
+├── docs/             # Comprehensive project documentation
+├── .github/          # GitHub configuration
+├── docker-compose.yml         # Service orchestration
+├── manage-services.sh         # Service management script
+└── build-pdf-service.sh      # PDF service build utility
 ```
 
 ## 📚 Documentation
@@ -25,144 +39,178 @@ Comprehensive documentation is available in the [`docs/`](./docs/) folder:
 
 ## Features
 
-- **Authentication System**: User login with User ID/Email and Group ID
-- **Dashboard Interface**: Modern banking dashboard matching VuBank's design
-- **Account Management**: Multiple account types with balance tracking
+- **Authentication System**: Multi-layer authentication with JWT tokens and session management
+- **Dashboard Interface**: Modern banking dashboard matching VuBank's design principles
+- **Account Management**: Multiple account types with real-time balance tracking
 - **Fund Transfer System**: Complete multi-step transfer process with payee management
-- **PDF Receipt Generation**: Professional PDF receipts for transactions
-- **Transaction History**: Synthetic transaction data with realistic patterns
-- **Microservices Architecture**: Modular backend services for different banking operations
-- **Responsive Design**: Mobile-friendly interface
-- **Synthetic Data**: Realistic banking data for testing and demonstration
+- **PDF Receipt Generation**: Professional PDF receipts using Java Spring Boot service
+- **Transaction History**: Synthetic transaction data with realistic banking patterns
+- **Microservices Architecture**: Modular backend services for scalability and maintainability
+- **Responsive Design**: Mobile-friendly interface with cross-device compatibility
+- **Synthetic Data**: Comprehensive realistic banking data for testing and demonstration
+- **Session Management**: Single active session with conflict resolution
+- **Service Management**: Automated service orchestration and health monitoring
 
 ## Technology Stack
 
 ### Frontend
-- HTML5 with vanilla JavaScript
-- Modern CSS3 with custom styling matching VuBank branding
-- Responsive design principles
-- AJAX for API communication
+- **HTML5** with semantic markup and accessibility features
+- **Vanilla JavaScript (ES6+)** with modern API integration
+- **CSS3** with custom styling matching VuBank branding
+- **Responsive Design** principles for cross-device compatibility
+- **AJAX/Fetch API** for seamless backend communication
+- **JWT Token Management** for secure authentication
 
 ### Backend Microservices
-- **Go Services**: Login gateway and accounts service
-- **Python Service**: Authentication and user management
-- **Java Service**: PDF receipt generation with iText
-- **Node.js**: Main backend coordination
-- **PostgreSQL**: Primary database
-- JWT authentication across services
-- Docker containerization for all services
+- **Go Services**: High-performance API gateway and accounts management
+- **Python Service**: Authentication and user session management using FastAPI
+- **Java Service**: PDF receipt generation with Spring Boot and iText library
+- **Node.js**: Backend coordination and service orchestration
+- **PostgreSQL**: Primary database with optimized schema design
+- **Docker**: Containerization for all services with multi-stage builds
+- **JWT Authentication**: Secure token-based authentication across services
 
 ## Getting Started
 
 ### Service Architecture
 
-VuBank consists of multiple microservices:
+VuBank consists of multiple containerized microservices:
 
-| Service | Technology | Port | Purpose |
-|---------|------------|------|---------|
-| Frontend | HTML/CSS/JS | 3001 | User interface |
-| Login Gateway | Go | 8000 | Main API gateway |
-| Auth Service | Python | 8001 | User authentication |
-| Accounts Service | Go | 8002 | Account management |
-| PDF Service | Java/Spring Boot | 8003 | Receipt generation |
-| Database | PostgreSQL | 5432 | Data persistence |
+| Service | Technology | Port | Purpose | Status |
+|---------|------------|------|---------|--------|
+| Frontend | HTML/CSS/JS | 3001 | User interface and client-side logic | ✅ Active |
+| Login Gateway | Go (Gin) | 8000 | Main API gateway and JWT management | ✅ Active |
+| Auth Service | Python (FastAPI) | 8001 | User authentication and session management | ✅ Active |
+| Accounts Service | Go (Gin) | 8002 | Account management and transaction data | ✅ Active |
+| PDF Service | Java (Spring Boot) | 8003 | Professional PDF receipt generation | ✅ Active |
+| Database | PostgreSQL 15 | 5432 | Data persistence and transaction storage | ✅ Active |
+
+### Service Management
+
+Use the integrated service management script for all operations:
+
+```bash
+# Check status of all services
+./manage-services.sh status
+
+# Start all services
+./manage-services.sh start
+
+# Stop all services  
+./manage-services.sh stop
+
+# View service logs
+./manage-services.sh logs
+
+# Run health checks
+./manage-services.sh health
+```
 
 ### Prerequisites
-- Docker and Docker Compose
-- Maven (for PDF service)
-- Node.js 16+ (for optional React frontend)
+- **Docker** and **Docker Compose** (required for all services)
+- **Maven 3.6+** (for PDF service development)
+- **curl** (for health checks and API testing)
+- **Git** (for repository management)
 
 ### Quick Start
 
-1. **Start All Services**
-   ```bash
-   # Clone and navigate to project
-   cd vuNGBank
-   
-   # Start all services using Docker Compose
-   ./manage-services.sh start
-   ```
+**Option 1: Automated Setup (Recommended)**
+```bash
+# Clone and navigate to project
+git clone <repository-url>
+cd vuNGBank
 
-2. **Build PDF Service (if needed)**
-   ```bash
-   # Build the Java PDF service separately
-   ./build-pdf-service.sh
-   ```
+# Install dependencies and start all services
+./manage-services.sh install
+./manage-services.sh start
 
-3. **Access the Application**
-   - **Frontend**: http://localhost:3001
-   - **API Gateway**: http://localhost:8000
-   - **PDF Service**: http://localhost:8003
+# Check service status
+./manage-services.sh status
+```
 
-### Manual Installation (Alternative)
+**Option 2: Manual Docker Setup**
+```bash
+# Start all services using Docker Compose
+docker compose up -d
 
-1. **Install Backend Dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
+# Build PDF service separately if needed
+./build-pdf-service.sh
 
-2. **Install Frontend Dependencies**
-   ```bash
-   cd frontend
-   npm install
-   ```
+# Start frontend server
+./frontend-server.sh start
+```
 
-### Running the Application
-
-1. **Start the Backend Server**
-   ```bash
-   cd backend
-   npm run dev
-   ```
-   The API server will start on `http://localhost:5000`
-
-2. **Start the Frontend Application**
-   ```bash
-   cd frontend
-   npm start
-   ```
-   The React app will start on `http://localhost:3000`
+### Access the Application
+Once all services are running:
+- **Banking Portal**: http://localhost:3001
+- **API Gateway**: http://localhost:8000/health  
+- **PDF Service**: http://localhost:8003/api/pdf/health
+- **Service Status**: `./manage-services.sh status`
 
 ### Default Login Credentials
-
-For testing purposes, you can use:
-- **User ID**: `johndoe123` or `john.doe@example.com`
-- **Group ID**: `CORPORATE` (optional)
+Use these test accounts for demonstration:
+- **Retail User**: `johndoe` / `password123`
+- **Corporate User**: `janedoe` / `password123`
+- **Admin User**: `corpuser` / `password123`
 
 ## API Endpoints
 
-### Authentication
-- `POST /api/auth/login` - User login
+### Authentication & Gateway (Port 8000)
+- `POST /api/login` - User authentication with JWT token generation
+- `GET /api/health` - Gateway service health check
 
-### User Management
-- `GET /api/user/profile` - Get user profile (authenticated)
+### Account Management (Port 8002) 
+- `GET /internal/accounts` - Get user accounts and transaction data (JWT required)
+- `GET /health` - Accounts service health check
 
-### Account Services
-- `GET /api/accounts` - Get user accounts (authenticated)
-- `GET /api/accounts/:id/transactions` - Get account transactions (authenticated)
+### PDF Receipt Generation (Port 8003)
+- `POST /api/pdf/generate-receipt` - Generate transaction PDF receipt  
+- `GET /api/pdf/health` - PDF service health check
+- `GET /actuator/health` - Spring Boot actuator health endpoint
 
-### Transaction Services
-- `POST /api/transactions/transfer` - Transfer money (authenticated)
+### Fund Transfer System
+- **Multi-step Transfer Process**: Step-by-step fund transfer with validation
+- **Payee Management**: Add and manage transfer recipients
+- **Transaction Confirmation**: PIN verification and receipt generation
+- **Real-time Balance Updates**: Account balance synchronization
 
-### System
-- `GET /health` - Health check endpoint
-- `GET /` - API documentation
+### System Management
+- `./manage-services.sh status` - Check all service statuses
+- `./manage-services.sh health` - Run comprehensive health checks
+- `./manage-services.sh logs` - View aggregated service logs
 
 ## Architecture
 
-The application follows a microservices architecture with clear separation of concerns:
+The application follows a **microservices architecture** with clear separation of concerns and containerized deployment:
 
-### Frontend Components
-- `LoginPage`: Authentication interface matching SCB design
-- `Dashboard`: Main banking dashboard with account overview
-- `App`: Main application component with routing logic
+### Frontend Layer
+- **Technology**: Pure HTML5, CSS3, and vanilla JavaScript
+- **Design**: VuBank-inspired interface with responsive layouts
+- **Features**: Fund transfer workflow, dashboard, PDF receipt downloads
+- **Authentication**: JWT token-based session management
 
-### Backend Services
-- **Authentication Service**: JWT-based user authentication
-- **Account Service**: Account management and balance tracking  
-- **Transaction Service**: Transaction processing and history
-- **Data Generation Service**: Synthetic data creation using Faker.js
+### Microservices Layer
+- **API Gateway (Go)**: Public-facing authentication and request routing
+- **Authentication Service (Python)**: Secure credential verification and session management  
+- **Account Service (Go)**: Account data management and transaction processing
+- **PDF Service (Java)**: Professional receipt generation using Spring Boot and iText
+- **Database Layer (PostgreSQL)**: Optimized schema with proper indexing
+
+### Service Communication
+- **JWT Authentication**: Stateless token-based security across services
+- **Docker Networking**: Internal service communication
+- **Health Monitoring**: Comprehensive health checks and status reporting
+- **Error Handling**: Graceful degradation and error recovery
+
+### Development Workflow
+```bash
+# Development cycle
+./manage-services.sh start     # Start all services
+# Make changes to code
+./manage-services.sh restart   # Restart affected services
+./manage-services.sh logs      # Monitor service logs
+./manage-services.sh health    # Verify service health
+```
 
 ## Synthetic Data
 
@@ -182,21 +230,65 @@ The application generates realistic banking data including:
 
 ## Development
 
-### Available Scripts
+### Service Development Scripts
 
-**Frontend:**
-- `npm start` - Start development server
-- `npm build` - Build for production
-- `npm test` - Run tests
+**Service Management:**
+```bash
+# Service lifecycle
+./manage-services.sh start     # Start all services
+./manage-services.sh stop      # Stop all services  
+./manage-services.sh restart   # Restart all services
+./manage-services.sh status    # Check service status
+./manage-services.sh logs      # View service logs
+./manage-services.sh health    # Run health checks
+```
 
-**Backend:**
-- `npm run dev` - Start with nodemon (auto-reload)
-- `npm start` - Start production server
-- `npm test` - Run tests
+**PDF Service Development:**
+```bash
+# Build PDF service locally
+./build-pdf-service.sh
+
+# Manual Maven build (if needed)
+cd backend/services/pdf-receipt-java-service
+mvn clean package
+docker build -t pdf-receipt-service .
+```
+
+**Frontend Development:**
+```bash
+# Start frontend server manually
+./frontend-server.sh start
+./frontend-server.sh stop
+./frontend-server.sh logs
+```
+
+### Available Service Endpoints
+
+**Development Environment:**
+- **Frontend**: http://localhost:3001
+- **API Gateway**: http://localhost:8000
+- **Auth Service**: http://localhost:8001 (internal)
+- **Accounts Service**: http://localhost:8002 (internal)  
+- **PDF Service**: http://localhost:8003
+- **Database**: localhost:5432
+
+**Health Check Endpoints:**
+- Gateway: `curl http://localhost:8000/api/health`
+- PDF Service: `curl http://localhost:8003/api/pdf/health`
+- Accounts: `curl http://localhost:8002/health`
 
 ### Project Status
 
-This project simulates a complete banking platform for demonstration and testing purposes. All financial data is synthetic and no real banking operations are performed.
+This is a **complete banking simulation platform** with:
+- ✅ **Full Authentication System** - Multi-layer security with JWT
+- ✅ **Fund Transfer Workflow** - Complete multi-step process
+- ✅ **PDF Receipt Generation** - Professional transaction receipts  
+- ✅ **Account Management** - Multiple account types and balances
+- ✅ **Service Orchestration** - Docker-based microservices
+- ✅ **Health Monitoring** - Comprehensive service monitoring
+- ✅ **Synthetic Data** - Realistic banking test data
+
+All financial data is synthetic and the system is designed for demonstration and testing purposes only.
 
 ## License
 

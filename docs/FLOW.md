@@ -219,6 +219,187 @@ Database Query → Service Processing → API Response → Frontend Display
    - Account data fetched automatically
    - Real-time balance and transaction display
 
+## Fund Transfer Workflow
+
+### Complete Fund Transfer Journey
+```mermaid
+sequenceDiagram
+    participant U as User/Frontend
+    participant FT as Fund Transfer Page
+    participant API as Accounts Service :8002
+    participant PDF as PDF Service :8003
+
+    U->>FT: Navigate to /FundTransfer.html
+    FT->>FT: Load user session data
+    FT->>API: GET account balances (JWT)
+    API-->>FT: Account list with balances
+    
+    Note over FT: Step 1: Transfer Details
+    U->>FT: Enter amount and select accounts
+    FT->>FT: Validate amount vs balance
+    FT->>FT: Show payee search/selection
+    
+    Note over FT: Step 2: Payee Management  
+    U->>FT: Search or add new payee
+    FT->>FT: Display payee suggestions
+    U->>FT: Select/confirm payee details
+    FT->>FT: Validate transfer details
+    
+    Note over FT: Step 3: Confirmation
+    FT->>FT: Display transfer summary
+    U->>FT: Review and confirm details
+    U->>FT: Enter 4-digit PIN
+    FT->>FT: Validate PIN format
+    
+    Note over FT: Step 4: Processing
+    FT->>API: POST transfer request (simulated)
+    API-->>FT: Transaction confirmation
+    FT->>FT: Display success screen
+    
+    Note over FT: Step 5: Receipt Generation
+    U->>FT: Click "Download Receipt"
+    FT->>PDF: POST /api/pdf/generate-receipt
+    PDF-->>FT: PDF file download
+    FT-->>U: Browser downloads PDF receipt
+```
+
+### Multi-Step Transfer Process
+
+#### Step 1: Transfer Details & Account Selection
+**Purpose**: Capture basic transfer information and validate user inputs
+**Components**:
+- **Amount Input**: Real-time validation against account balance
+- **Source Account**: Dropdown with current balances displayed
+- **Currency**: Fixed to USD (extensible for multi-currency)
+- **Transfer Type**: Fund Transfer (default)
+
+**Validations**:
+```javascript
+// Amount validation
+if (amount <= 0) return "Amount must be greater than zero"
+if (amount > accountBalance) return "Insufficient balance"
+if (!isValidNumber(amount)) return "Invalid amount format"
+
+// Account validation  
+if (fromAccount === toAccount) return "Cannot transfer to same account"
+if (!fromAccount || !toAccount) return "Please select accounts"
+```
+
+#### Step 2: Payee Management & Selection
+**Purpose**: Manage transfer recipients with search and add functionality
+**Features**:
+- **Payee Search**: Real-time search with autocomplete suggestions
+- **Add New Payee**: Modal form for new payee registration
+- **Payee Validation**: Account number format and bank validation
+- **Recent Payees**: Quick access to frequently used recipients
+
+**Payee Data Structure**:
+```javascript
+const payee = {
+  id: "payee_001",
+  name: "John Smith", 
+  accountNumber: "1001234567891",
+  bankName: "VuBank",
+  accountType: "checking",
+  nickname: "John - Checking",
+  verified: true,
+  lastUsed: "2025-01-15T10:30:00Z"
+}
+```
+
+#### Step 3: Confirmation & PIN Verification
+**Purpose**: Final review and secure authorization
+**Components**:
+- **Transfer Summary**: Complete transfer details review
+- **PIN Entry**: 4-digit security PIN with masked input
+- **Terms Acceptance**: Transfer terms and conditions
+- **Final Validation**: All transfer parameters confirmed
+
+**Security Features**:
+```javascript
+// PIN validation
+const validatePIN = (pin) => {
+  if (pin.length !== 4) return false
+  if (!/^\d{4}$/.test(pin)) return false
+  // In production: validate against encrypted stored PIN
+  return pin === "1234" // Demo PIN
+}
+```
+
+#### Step 4: Transaction Processing
+**Purpose**: Execute transfer and provide confirmation
+**Process**:
+1. **Pre-validation**: Final balance and account checks
+2. **Transaction Simulation**: Realistic processing time (2-3 seconds)
+3. **Transaction ID Generation**: Unique reference number
+4. **Balance Updates**: Real-time account balance synchronization
+5. **Confirmation Display**: Success message with transaction details
+
+#### Step 5: Receipt Generation & Download
+**Purpose**: Provide professional transaction documentation
+**Features**:
+- **PDF Generation**: Professional bank-branded receipt
+- **Transaction Details**: Complete transfer information
+- **Download Prompt**: Automatic browser download initiation
+- **Receipt Naming**: Dynamic filename with transaction ID
+
+### Frontend State Management
+
+#### Multi-Step Navigation
+```javascript
+class FundTransferManager {
+  constructor() {
+    this.currentStep = 1
+    this.maxSteps = 5
+    this.transferData = {}
+    this.validationErrors = {}
+  }
+  
+  goToStep(step) {
+    if (step > this.currentStep && !this.validateCurrentStep()) {
+      return false // Prevent forward navigation with errors
+    }
+    this.currentStep = step
+    this.updateUI()
+  }
+  
+  validateStep(stepNumber) {
+    switch(stepNumber) {
+      case 1: return this.validateTransferDetails()
+      case 2: return this.validatePayeeSelection() 
+      case 3: return this.validateConfirmation()
+      case 4: return this.processTransfer()
+    }
+  }
+}
+```
+
+#### Data Persistence
+- **Session Storage**: Transfer data persisted across page reloads
+- **Form Recovery**: Auto-recovery of partially completed transfers
+- **Validation State**: Real-time validation with user feedback
+- **Progress Indicators**: Visual progress through transfer steps
+
+### Error Handling & User Experience
+
+#### Validation Errors
+```javascript
+const errorTypes = {
+  INSUFFICIENT_BALANCE: "Insufficient account balance",
+  INVALID_AMOUNT: "Please enter a valid amount",
+  PAYEE_REQUIRED: "Please select a payee",
+  INVALID_PIN: "Please enter your 4-digit PIN",
+  ACCOUNT_SELECTION: "Please select different source and destination accounts"
+}
+```
+
+#### User Feedback
+- **Real-time Validation**: Immediate feedback on form inputs  
+- **Progress Indicators**: Clear step-by-step progress display
+- **Loading States**: Smooth loading animations during processing
+- **Success Confirmation**: Clear confirmation of completed transfers
+- **Error Recovery**: Helpful error messages with resolution steps
+
 ### Session Conflict Resolution Journey
 1. **Conflict Detection**
    - User attempts login with existing session
@@ -367,3 +548,51 @@ const Dashboard = ({ user, onLogout }) => {
 - **Request Correlation**: Unique IDs for distributed request tracing
 - **Circuit Breaker**: Fail fast when dependent services are down
 - **Caching Strategy**: JWT validation results cached for duration of token
+
+## PDF Receipt Generation Flow
+
+### Transaction Receipt Generation
+```mermaid
+sequenceDiagram
+    participant U as User/Frontend
+    participant PDF as Java PDF Service :8003
+    participant ITXT as iText PDF Engine
+
+    U->>PDF: POST /api/pdf/generate-receipt
+    Note over U: Transaction data payload:<br/>{transaction, fromAccount,<br/>toAccount, user}
+    
+    PDF->>PDF: Validate request payload
+    Note over PDF: Check required fields:<br/>- Transaction ID, amount, date<br/>- Account details<br/>- User information
+    
+    PDF->>ITXT: Initialize PDF document
+    ITXT-->>PDF: PDF document object
+    
+    PDF->>ITXT: Add bank header & logo
+    PDF->>ITXT: Add transaction details table
+    PDF->>ITXT: Add account information
+    PDF->>ITXT: Add reference numbers
+    PDF->>ITXT: Add timestamp & footer
+    
+    ITXT-->>PDF: Complete PDF document
+    PDF->>PDF: Set response headers
+    Note over PDF: Content-Type: application/pdf<br/>Content-Disposition: attachment
+    
+    PDF-->>U: PDF file download
+    Note over U: Browser downloads:<br/>transaction_receipt_[ID].pdf
+```
+
+### Error Handling in PDF Generation
+```
+Request Validation:
+├── Missing transaction ID → 400 Bad Request
+├── Invalid date format → 400 Bad Request  
+├── Missing account data → 400 Bad Request
+└── PDF generation failure → 500 Internal Server Error
+```
+
+### Integration Points
+- **Frontend Integration**: Direct API calls from fund transfer page
+- **CORS Configuration**: Enabled for localhost:3001 origin
+- **File Naming**: Dynamic filename based on transaction ID
+- **Error Responses**: JSON error format matching other services
+- **Health Monitoring**: Dedicated health check endpoint
