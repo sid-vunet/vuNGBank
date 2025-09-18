@@ -1,5 +1,6 @@
 package com.vubank.payment.service;
 
+import co.elastic.apm.api.ElasticApm;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -56,6 +57,19 @@ public class CoreBankingService {
                 headers.set("X-Request-Id", request.getXRequestId());
                 headers.set("X-Origin-Service", "payment-process");
                 headers.set("X-Txn-Ref", txnRef);
+                
+                // Add APM trace headers for distributed tracing
+                co.elastic.apm.api.Transaction currentTransaction = ElasticApm.currentTransaction();
+                if (currentTransaction != null) {
+                    String traceParent = currentTransaction.getTraceId();
+                    String traceState = currentTransaction.getId(); 
+                    if (traceParent != null && !traceParent.isEmpty()) {
+                        // Format traceparent header according to W3C spec
+                        String formattedTraceParent = String.format("00-%s-%s-01", traceParent, traceState);
+                        headers.set("traceparent", formattedTraceParent);
+                        logger.debug("Added traceparent header: {}", formattedTraceParent);
+                    }
+                }
                 
                 // Use user's JWT token if provided, otherwise fallback to shared secret
                 if (userAuthorization != null && !userAuthorization.trim().isEmpty()) {

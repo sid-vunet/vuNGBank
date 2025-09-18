@@ -88,6 +88,24 @@ public class AccountsService {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             
+            // Add distributed tracing headers
+            Transaction currentTransaction = ElasticApm.currentTransaction();
+            if (currentTransaction != null) {
+                try {
+                    // Get trace context and add headers for distributed tracing
+                    String traceId = currentTransaction.getTraceId();
+                    String spanId = span.getId();
+                    if (traceId != null && spanId != null) {
+                        String traceparent = String.format("00-%s-%s-01", traceId, spanId);
+                        headers.set("traceparent", traceparent);
+                        headers.set("tracestate", "vubank=corebanking-service");
+                        logger.debug("Adding distributed tracing headers: traceparent={}", traceparent);
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to add distributed tracing headers: {}", e.getMessage());
+                }
+            }
+            
             if (userAuthorization != null && !userAuthorization.trim().isEmpty()) {
                 headers.set("Authorization", userAuthorization);
                 logger.debug("Using user JWT token for debit account call");
@@ -277,6 +295,24 @@ public class AccountsService {
             // Create headers with user's JWT token
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            // Add distributed tracing headers
+            Transaction currentTransaction = ElasticApm.currentTransaction();
+            if (currentTransaction != null) {
+                try {
+                    // Get trace context and add headers for distributed tracing
+                    String traceId = currentTransaction.getTraceId();
+                    String spanId = span.getId();
+                    if (traceId != null && spanId != null) {
+                        String traceparent = String.format("00-%s-%s-01", traceId, spanId);
+                        headers.set("traceparent", traceparent);
+                        headers.set("tracestate", "vubank=corebanking-transaction");
+                        logger.debug("Adding distributed tracing headers for transaction recording: traceparent={}", traceparent);
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to add distributed tracing headers: {}", e.getMessage());
+                }
+            }
             
             if (userAuthorization != null && !userAuthorization.trim().isEmpty()) {
                 headers.set("Authorization", userAuthorization);

@@ -41,12 +41,22 @@ public class CoreBankingController {
             @RequestHeader(value = "X-Request-Id") String xRequestId,
             @RequestHeader(value = "X-Origin-Service") String xOriginService,
             @RequestHeader(value = "X-Txn-Ref") String xTxnRef,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "traceparent", required = false) String traceparent,
+            @RequestHeader(value = "tracestate", required = false) String tracestate) {
 
-        // Start APM Transaction
-        Transaction transaction = ElasticApm.startTransaction();
-        transaction.setName("corebanking-payment-processing");
-        transaction.setType("request");
+        // Use current transaction if available (from Spring Boot auto-instrumentation)
+        // instead of starting a new one to preserve distributed tracing
+        Transaction transaction = ElasticApm.currentTransaction();
+        if (transaction != null) {
+            transaction.setName("corebanking-payment-processing");
+            transaction.setType("request");
+        } else {
+            // Fallback to creating new transaction if none exists
+            transaction = ElasticApm.startTransaction();
+            transaction.setName("corebanking-payment-processing");
+            transaction.setType("request");
+        }
 
         // Add context to MDC for logging
         MDC.put("xRequestId", xRequestId);
@@ -58,6 +68,14 @@ public class CoreBankingController {
         transaction.addLabel("x-txn-ref", xTxnRef);
         transaction.addLabel("x-origin-service", xOriginService);
         transaction.addLabel("service", "corebanking-processor");
+        
+        // Add trace context labels if present
+        if (traceparent != null) {
+            transaction.addLabel("trace-parent", traceparent);
+        }
+        if (tracestate != null) {
+            transaction.addLabel("trace-state", tracestate);
+        }
 
         logger.info("Received payment processing request - xRequestId: {}, xTxnRef: {}, origin: {}", 
                    xRequestId, xTxnRef, xOriginService);
