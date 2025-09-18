@@ -21,7 +21,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? "Host=localhost;Port=5432;Database=vubank_db;Username=vubank_user;Password=vubank_pass;";
 
 builder.Services.AddDbContext<PayeeDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString)
+           .EnableSensitiveDataLogging()  // Shows parameter values
+           .LogTo(Console.WriteLine, LogLevel.Information)); // Logs SQL to console
 
 // Register services
 builder.Services.AddScoped<IPayeeService, PayeeService.Services.PayeeService>();

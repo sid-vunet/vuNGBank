@@ -106,8 +106,19 @@ namespace PayeeService.Controllers
         {
             try
             {
+                // Debug logging - log the raw request
+                _logger.LogInformation($"AddPayee controller called");
+                _logger.LogInformation($"Raw request PayeeName: '{request?.PayeeName}'");
+                _logger.LogInformation($"Raw request BeneficiaryName: '{request?.BeneficiaryName}'");
+                _logger.LogInformation($"Raw request AccountNumber: '{request?.AccountNumber}'");
+                _logger.LogInformation($"Raw request IfscCode: '{request?.IfscCode}'");
+                _logger.LogInformation($"Raw request AccountType: '{request?.AccountType}'");
+                
                 if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning($"Model validation failed: {string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage))}");
                     return BadRequest(ModelState);
+                }
 
                 var userId = GetUserId();
                 if (string.IsNullOrEmpty(userId))

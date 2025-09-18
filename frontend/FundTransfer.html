@@ -405,6 +405,53 @@
             margin-bottom: 24px;
         }
 
+        .transfer-main-content {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .payee-search-section {
+            text-align: center;
+        }
+
+        .payee-search-input {
+            font-size: 18px;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 32px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-add-new-payee {
+            background: #f3f4f6;
+            border: 2px solid #d1d5db;
+            color: #374151;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+        }
+
+        .btn-add-new-payee:hover {
+            background: #e5e7eb;
+            border-color: #9ca3af;
+        }
+
+        .btn-proceed {
+            padding: 12px 32px;
+            font-weight: 600;
+        }
+
+        .btn-proceed:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .form-group {
             margin-bottom: 24px;
         }
@@ -492,11 +539,109 @@
             font-weight: 600;
         }
 
+        .add-payee-suggestion {
+            border-top: 1px solid #e5e7eb;
+            background: #eff6ff;
+        }
+
+        .add-payee-suggestion:hover {
+            background: #dbeafe;
+        }
+
         .add-payee-item:hover {
             background: #dbeafe;
         }
 
+        .btn-transfer-now {
+            background: #10b981;
+            color: white;
+            border: none;
+        }
+
+        .btn-transfer-now:hover {
+            background: #059669;
+        }
+
+        .btn-transfer-now:disabled {
+            background: #d1d5db;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+
         /* Add Payee Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+        }
+
+        .modal .modal-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            transform: translateY(-50px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #374151;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 24px;
+            border-top: 1px solid #e5e7eb;
+        }
+
         .bank-details {
             margin-top: 8px;
             padding: 12px;
@@ -990,42 +1135,44 @@
             </div>
         </div>
 
-        <!-- Step 1: Select Payee -->
+        <!-- Main Fund Transfer Page -->
         <div class="transfer-step active" id="step1">
             <div class="transfer-card">
-                <h2 style="margin-bottom: 24px; color: #1f2937;">Select Payee</h2>
+                <h2 style="margin-bottom: 32px; color: #1f2937; text-align: center;">Fund Transfer</h2>
                 
-                <div class="form-group">
-                    <label class="form-label" for="payeeSearch">Search or Select Payee</label>
-                    <div class="payee-dropdown">
-                        <input 
-                            type="text" 
-                            id="payeeSearch" 
-                            class="form-input" 
-                            placeholder="Type payee name or account number..."
-                            autocomplete="off"
-                        >
-                        <div class="payee-suggestions" id="payeeSuggestions">
-                            <!-- Dynamic payee suggestions will be populated here -->
+                <div class="transfer-main-content">
+                    <div class="payee-search-section">
+                        <div class="form-group">
+                            <label class="form-label" for="payeeSearch">Search for a Payee</label>
+                            <div class="payee-dropdown">
+                                <input 
+                                    type="text" 
+                                    id="payeeSearch" 
+                                    class="form-input payee-search-input" 
+                                    placeholder="Start typing payee name..."
+                                    autocomplete="off"
+                                >
+                                <div class="payee-suggestions" id="payeeSuggestions">
+                                    <!-- Dynamic payee suggestions will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button type="button" class="btn btn-secondary btn-add-new-payee" onclick="window.fundTransferManager.showAddPayeeForm()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="2"/>
+                                    <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                                Add New Payee
+                            </button>
+                            
+                            <button type="button" class="btn btn-primary btn-proceed" id="proceedBtn" onclick="window.fundTransferManager.proceedToPayment()" disabled>
+                                Proceed to Payment
+                            </button>
                         </div>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <button type="button" class="btn btn-secondary" onclick="showAddPayeeForm()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                            <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="2"/>
-                            <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                        Add New Payee
-                    </button>
-                </div>
-
-                <div class="action-buttons">
-                    <button class="btn btn-primary" id="continueToStep2" onclick="goToStep(2)" disabled>
-                        Continue
-                    </button>
                 </div>
             </div>
         </div>
@@ -1221,9 +1368,9 @@
             <div class="modal-body">
                 <form id="addPayeeForm" onsubmit="handleAddPayee(event)">
                     <div class="form-group">
-                        <label class="form-label" for="payeeName">Beneficiary Name</label>
+                        <label class="form-label" for="payeeName">Payee Name</label>
                         <input type="text" id="payeeName" class="form-input" required 
-                               placeholder="Enter beneficiary name">
+                               placeholder="Enter payee name">
                     </div>
                     
                     <div class="form-group">
@@ -1261,6 +1408,9 @@
                 <button type="submit" form="addPayeeForm" class="btn btn-primary" id="addPayeeSubmit">
                     Add Payee
                 </button>
+                <button type="button" class="btn btn-transfer-now" id="transferNowBtn" onclick="window.fundTransferManager.handleTransferNow()" style="display: none;">
+                    Proceed to Pay
+                </button>
             </div>
         </div>
     </div>
@@ -1282,6 +1432,12 @@
         function showAddPayeeForm(query = '') {
             if (window.fundTransferManager) {
                 window.fundTransferManager.showAddPayeeForm(query);
+            }
+        }
+
+        function handleTransferNow() {
+            if (window.fundTransferManager) {
+                window.fundTransferManager.handleTransferNow();
             }
         }
 
@@ -1550,10 +1706,17 @@
 
                     const payeesData = await response.json();
                     
+                    // Debug: Log the actual API response structure
+                    console.log('Payees API Response:', payeesData);
+                    if (payeesData.length > 0) {
+                        console.log('First payee structure:', Object.keys(payeesData[0]));
+                        console.log('First payee data:', payeesData[0]);
+                    }
+                    
                     // Transform API response to match frontend format with enhanced fields
                     this.payees = payeesData.map(payee => ({
                         id: payee.id,
-                        name: payee.beneficiaryName,
+                        name: payee.payeeName || payee.beneficiaryName || 'Unknown Name',
                         accountNumber: payee.accountNumber,
                         bankName: payee.bankName,
                         branchName: payee.branchName,
@@ -1582,7 +1745,7 @@
             handlePayeeSearch(query) {
                 if (query.length === 0) {
                     this.selectedPayee = null;
-                    this.continueToStep2.disabled = true;
+                    document.getElementById('proceedBtn').disabled = true;
                     this.hidePayeeSuggestions();
                     return;
                 }
@@ -1598,6 +1761,7 @@
             displayPayeeSuggestions(payees, query) {
                 this.payeeSuggestions.innerHTML = '';
 
+                // Show existing payees
                 payees.forEach(payee => {
                     const item = document.createElement('div');
                     item.className = 'suggestion-item';
@@ -1610,20 +1774,21 @@
                     this.payeeSuggestions.appendChild(item);
                 });
 
-                if (payees.length === 0) {
+                // Add "Add [name] as payee" option if no exact match and query is not empty
+                if (query.trim() && !payees.some(p => p.name.toLowerCase() === query.toLowerCase().trim())) {
                     const addPayeeItem = document.createElement('div');
-                    addPayeeItem.className = 'suggestion-item add-payee-item';
+                    addPayeeItem.className = 'suggestion-item add-payee-suggestion';
                     addPayeeItem.innerHTML = `
-                        <div>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                        <div style="display: flex; align-items: center;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px; color: #3b82f6;">
                                 <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                                 <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="2"/>
                                 <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2"/>
                             </svg>
-                            Add "${query}" as new payee
+                            <div style="font-weight: 600; color: #3b82f6;">Add "${query.trim()}" as payee</div>
                         </div>
                     `;
-                    addPayeeItem.onclick = () => this.showAddPayeeForm(query);
+                    addPayeeItem.onclick = () => this.showAddPayeeForm(query.trim());
                     this.payeeSuggestions.appendChild(addPayeeItem);
                 }
 
@@ -1634,7 +1799,7 @@
                 this.selectedPayee = payee;
                 this.payeeSearch.value = payee.name;
                 this.hidePayeeSuggestions();
-                this.continueToStep2.disabled = false;
+                document.getElementById('proceedBtn').disabled = false;
             }
 
             showPayeeSuggestions() {
@@ -1755,6 +1920,19 @@
                 const modal = document.getElementById('addPayeeModal');
                 const nameInput = document.getElementById('payeeName');
                 
+                // Reset button states when showing modal
+                const submitBtn = document.getElementById('addPayeeSubmit');
+                const transferBtn = document.getElementById('transferNowBtn');
+                
+                // Show Add Payee button, hide Transfer Now button
+                submitBtn.style.display = 'inline-block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Payee';
+                transferBtn.style.display = 'none';
+                
+                // Clear any previous state
+                this.newlyAddedPayee = null;
+                
                 // Pre-fill name if query was provided
                 if (query) {
                     nameInput.value = query;
@@ -1819,8 +1997,22 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+                        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        try {
+                            const errorData = await response.json();
+                            if (errorData.message) {
+                                errorMessage = errorData.message;
+                            } else if (errorData.errors) {
+                                // Handle validation errors
+                                errorMessage = Object.values(errorData.errors).flat().join(', ');
+                            } else if (errorData.title) {
+                                errorMessage = errorData.title;
+                            }
+                            console.error('Detailed API Error:', errorData);
+                        } catch (parseError) {
+                            console.error('Failed to parse error response:', parseError);
+                        }
+                        throw new Error(errorMessage);
                     }
 
                     return await response.json();
@@ -1834,6 +2026,7 @@
                 event.preventDefault();
                 
                 const submitBtn = document.getElementById('addPayeeSubmit');
+                const transferBtn = document.getElementById('transferNowBtn');
                 const originalText = submitBtn.textContent;
                 
                 try {
@@ -1841,8 +2034,7 @@
                     submitBtn.disabled = true;
                     submitBtn.innerHTML = '<span class="loading-spinner"></span> Adding...';
                     
-                    const formData = new FormData(event.target);
-                    const beneficiaryName = document.getElementById('payeeName').value;
+                    const payeeName = document.getElementById('payeeName').value;
                     const accountNumber = document.getElementById('payeeAccountNumber').value;
                     const ifscCode = document.getElementById('payeeIfscCode').value.toUpperCase();
                     const accountType = document.getElementById('payeeAccountType').value;
@@ -1854,7 +2046,8 @@
                     }
                     
                     const payeeData = {
-                        beneficiaryName,
+                        payeeName: payeeName,
+                        beneficiaryName: payeeName,
                         accountNumber,
                         ifscCode,
                         accountType
@@ -1866,7 +2059,7 @@
                     // Add to local payees array with enhanced fields
                     this.payees.push({
                         id: newPayee.id,
-                        name: newPayee.beneficiaryName,
+                        name: newPayee.payeeName,
                         accountNumber: newPayee.accountNumber,
                         bankName: newPayee.bankName,
                         branchName: newPayee.branchName,
@@ -1884,19 +2077,64 @@
                         upiEnabled: newPayee.upiEnabled
                     });
                     
-                    // Close modal and reset form
-                    this.hideAddPayeeModal();
+                    // Store the newly added payee for "Proceed to Pay" functionality
+                    this.newlyAddedPayee = this.payees[this.payees.length - 1];
+                    
+                    // Hide the Add Payee button and show Proceed to Pay button
+                    submitBtn.style.display = 'none';
+                    transferBtn.style.display = 'inline-block';
+                    transferBtn.style.background = '#10b981';
+                    transferBtn.textContent = 'Proceed to Pay';
                     
                     // Show success message
-                    this.showSuccessMessage(`Payee "${beneficiaryName}" added successfully!`);
+                    this.showSuccessMessage(`Payee "${payeeName}" added successfully!`);
                     
                 } catch (error) {
                     console.error('Error adding payee:', error);
                     alert(`Error adding payee: ${error.message}`);
-                } finally {
-                    // Reset button
+                    // Reset button on error
                     submitBtn.disabled = false;
                     submitBtn.textContent = originalText;
+                }
+            }
+
+            handleTransferNow() {
+                if (this.newlyAddedPayee) {
+                    // Set the newly added payee as selected
+                    this.selectedPayee = this.newlyAddedPayee;
+                    
+                    // Close the modal
+                    this.hideAddPayeeModal();
+                    
+                    // Go to step 2 with the payee pre-selected
+                    this.goToStep(2);
+                    
+                    // Update the payee display in step 2
+                    this.updateStep2PayeeDisplay();
+                }
+            }
+
+            updateStep2PayeeDisplay() {
+                if (this.selectedPayee) {
+                    const payeeDisplayElement = document.getElementById('selectedPayeeDisplay');
+                    if (payeeDisplayElement) {
+                        payeeDisplayElement.innerHTML = `
+                            <div class="payee-info">
+                                <div class="payee-name">${this.selectedPayee.name}</div>
+                                <div class="payee-details">${this.selectedPayee.accountNumber} • ${this.selectedPayee.bankName}</div>
+                            </div>
+                        `;
+                    }
+                }
+            }
+
+            proceedToPayment() {
+                if (this.selectedPayee) {
+                    // Go to step 2 with the selected payee
+                    this.goToStep(2);
+                    this.updateStep2PayeeDisplay();
+                } else {
+                    alert('Please select a payee first');
                 }
             }
 
@@ -1904,10 +2142,24 @@
                 const modal = document.getElementById('addPayeeModal');
                 modal.classList.remove('show');
                 
+                // Reset button states
+                const submitBtn = document.getElementById('addPayeeSubmit');
+                const transferBtn = document.getElementById('transferNowBtn');
+                
+                // Show Add Payee button, hide Transfer Now button
+                submitBtn.style.display = 'inline-block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Payee';
+                transferBtn.style.display = 'none';
+                transferBtn.textContent = 'Proceed to Pay';
+                
                 // Reset form
                 document.getElementById('addPayeeForm').reset();
                 document.getElementById('ifscValidationMessage').textContent = '';
                 document.getElementById('bankDetails').style.display = 'none';
+                
+                // Clear newly added payee reference
+                this.newlyAddedPayee = null;
             }
 
             showSuccessMessage(message) {

@@ -4,9 +4,23 @@ namespace PayeeService.Models.DTOs
 {
     public class AddPayeeRequest
     {
+        private string _payeeName = string.Empty;
+
         [Required]
         [StringLength(100, MinimumLength = 2)]
-        public string BeneficiaryName { get; set; } = string.Empty;
+        public string PayeeName 
+        { 
+            get => _payeeName; 
+            set => _payeeName = value?.Trim() ?? string.Empty; 
+        }
+
+        // Backward compatibility - BeneficiaryName sets the same field
+        [StringLength(100, MinimumLength = 2)]
+        public string BeneficiaryName 
+        { 
+            get => _payeeName; 
+            set => _payeeName = value?.Trim() ?? string.Empty; 
+        }
 
         [Required]
         [StringLength(50, MinimumLength = 8)]
@@ -25,7 +39,7 @@ namespace PayeeService.Models.DTOs
     public class PayeeResponse
     {
         public int Id { get; set; }
-        public string BeneficiaryName { get; set; } = string.Empty;
+        public string PayeeName { get; set; } = string.Empty;
         public string AccountNumber { get; set; } = string.Empty;
         public string IfscCode { get; set; } = string.Empty;
         public string BankName { get; set; } = string.Empty;

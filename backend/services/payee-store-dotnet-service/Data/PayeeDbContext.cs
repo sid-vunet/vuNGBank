@@ -36,6 +36,7 @@ namespace PayeeService.Data
                     {
                         Id = 1,
                         UserId = "john.doe@example.com",
+                        PayeeName = "Rajesh Kumar",
                         BeneficiaryName = "Rajesh Kumar",
                         AccountNumber = "123456789012",
                         IfscCode = "SBIN0000001",
@@ -48,6 +49,7 @@ namespace PayeeService.Data
                     {
                         Id = 2,
                         UserId = "john.doe@example.com",
+                        PayeeName = "Priya Sharma",
                         BeneficiaryName = "Priya Sharma",
                         AccountNumber = "987654321098",
                         IfscCode = "HDFC0000001",
@@ -60,6 +62,7 @@ namespace PayeeService.Data
                     {
                         Id = 3,
                         UserId = "john.doe@example.com",
+                        PayeeName = "Amit Patel",
                         BeneficiaryName = "Amit Patel",
                         AccountNumber = "555666777888",
                         IfscCode = "ICIC0000001",
@@ -72,6 +75,7 @@ namespace PayeeService.Data
                     {
                         Id = 4,
                         UserId = "john.doe@example.com",
+                        PayeeName = "Sunita Reddy",
                         BeneficiaryName = "Sunita Reddy",
                         AccountNumber = "111222333444",
                         IfscCode = "AXIS0000001",
@@ -84,6 +88,7 @@ namespace PayeeService.Data
                     {
                         Id = 5,
                         UserId = "john.doe@example.com",
+                        PayeeName = "Vikram Singh",
                         BeneficiaryName = "Vikram Singh",
                         AccountNumber = "999888777666",
                         IfscCode = "KKBK0000001",

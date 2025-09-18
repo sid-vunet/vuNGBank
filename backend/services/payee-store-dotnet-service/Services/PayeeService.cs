@@ -33,13 +33,13 @@ namespace PayeeService.Services
             {
                 var payees = await _context.Payees
                     .Where(p => p.UserId == userId)
-                    .OrderBy(p => p.BeneficiaryName)
+                    .OrderBy(p => p.PayeeName)
                     .ToListAsync();
 
                 return payees.Select(p => new PayeeResponse
                 {
                     Id = p.Id,
-                    BeneficiaryName = p.BeneficiaryName,
+                    PayeeName = p.PayeeName,
                     AccountNumber = p.AccountNumber,
                     IfscCode = p.IfscCode,
                     BankName = p.BankName,
@@ -79,7 +79,7 @@ namespace PayeeService.Services
                 return new PayeeResponse
                 {
                     Id = payee.Id,
-                    BeneficiaryName = payee.BeneficiaryName,
+                    PayeeName = payee.PayeeName,
                     AccountNumber = payee.AccountNumber,
                     IfscCode = payee.IfscCode,
                     BankName = payee.BankName,
@@ -110,11 +110,31 @@ namespace PayeeService.Services
         {
             try
             {
+                // Debug logging - log the incoming request
+                _logger.LogInformation($"AddPayeeAsync called for user: {userId}");
+                _logger.LogInformation($"Request PayeeName: '{request.PayeeName}'");
+                _logger.LogInformation($"Request BeneficiaryName: '{request.BeneficiaryName}'");
+                _logger.LogInformation($"Request AccountNumber: '{request.AccountNumber}'");
+                _logger.LogInformation($"Request IfscCode: '{request.IfscCode}'");
+                _logger.LogInformation($"Request AccountType: '{request.AccountType}'");
+
+                // Validate that we have a non-empty payee name
+                if (string.IsNullOrWhiteSpace(request.PayeeName))
+                {
+                    throw new ArgumentException("Payee name is required and cannot be empty");
+                }
+
+                // Sanitize inputs
+                var sanitizedPayeeName = request.PayeeName.Trim();
+                var sanitizedAccountNumber = request.AccountNumber?.Trim() ?? string.Empty;
+                var sanitizedIfscCode = request.IfscCode?.Trim()?.ToUpper() ?? string.Empty;
+                var sanitizedAccountType = request.AccountType?.Trim() ?? "Savings";
+                
                 // Check if payee already exists
                 var existingPayee = await _context.Payees
                     .FirstOrDefaultAsync(p => p.UserId == userId && 
-                                            p.AccountNumber == request.AccountNumber && 
-                                            p.IfscCode == request.IfscCode);
+                                            p.AccountNumber == sanitizedAccountNumber && 
+                                            p.IfscCode == sanitizedIfscCode);
 
                 if (existingPayee != null)
                 {
@@ -122,7 +142,7 @@ namespace PayeeService.Services
                 }
 
                 // Validate IFSC code
-                var ifscValidation = await _ifscService.ValidateIfscAsync(request.IfscCode);
+                var ifscValidation = await _ifscService.ValidateIfscAsync(sanitizedIfscCode);
                 if (!ifscValidation.IsValid)
                 {
                     throw new ArgumentException($"Invalid IFSC code: {ifscValidation.ErrorMessage}");
@@ -132,12 +152,13 @@ namespace PayeeService.Services
                 var payee = new Payee
                 {
                     UserId = userId,
-                    BeneficiaryName = request.BeneficiaryName,
-                    AccountNumber = request.AccountNumber,
-                    IfscCode = request.IfscCode.ToUpper(),
-                    BankName = ifscValidation.BankName!,
-                    BranchName = ifscValidation.BranchName!,
-                    AccountType = request.AccountType,
+                    PayeeName = sanitizedPayeeName,
+                    BeneficiaryName = sanitizedPayeeName, // Use the same value for backward compatibility
+                    AccountNumber = sanitizedAccountNumber,
+                    IfscCode = sanitizedIfscCode,
+                    BankName = ifscValidation.BankName ?? "Unknown Bank",
+                    BranchName = ifscValidation.BranchName ?? "Unknown Branch",
+                    AccountType = sanitizedAccountType,
                     City = ifscValidation.City,
                     State = ifscValidation.State,
                     BranchAddress = ifscValidation.Address,
@@ -152,7 +173,23 @@ namespace PayeeService.Services
                     UpdatedAt = DateTime.UtcNow
                 };
 
+                // Debug logging - log the entity before saving
+                _logger.LogInformation($"Creating Payee entity:");
+                _logger.LogInformation($"Entity PayeeName: '{payee.PayeeName}'");
+                _logger.LogInformation($"Entity BeneficiaryName: '{payee.BeneficiaryName}'");
+                _logger.LogInformation($"Entity UserId: '{payee.UserId}'");
+                _logger.LogInformation($"Entity AccountNumber: '{payee.AccountNumber}'");
+
                 _context.Payees.Add(payee);
+                
+                // Debug EF tracking before save
+                var entry = _context.Entry(payee);
+                _logger.LogInformation($"EF Entry State: {entry.State}");
+                foreach (var property in entry.Properties)
+                {
+                    _logger.LogInformation($"Property {property.Metadata.Name}: Value='{property.CurrentValue}', Modified={property.IsModified}");
+                }
+
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation($"Payee added successfully for user: {userId}, PayeeId: {payee.Id}");
@@ -160,7 +197,7 @@ namespace PayeeService.Services
                 return new PayeeResponse
                 {
                     Id = payee.Id,
-                    BeneficiaryName = payee.BeneficiaryName,
+                    PayeeName = payee.PayeeName,
                     AccountNumber = payee.AccountNumber,
                     IfscCode = payee.IfscCode,
                     BankName = payee.BankName,

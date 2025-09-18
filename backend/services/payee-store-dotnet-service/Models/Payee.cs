@@ -17,6 +17,11 @@ namespace PayeeService.Models
 
         [Required]
         [StringLength(100)]
+        [Column("payee_name")]
+        public string PayeeName { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100)]
         [Column("beneficiary_name")]
         public string BeneficiaryName { get; set; } = string.Empty;
 
