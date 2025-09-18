@@ -112,24 +112,10 @@ def cleanup_sessions_on_startup():
             print(success_msg)
             logger.info(success_msg)
             
-            # Add APM event for session cleanup
-            try:
-                elasticapm.capture_message(
-                    f"Service startup session cleanup: {affected_rows} sessions terminated",
-                    level="info",
-                    custom={"terminated_sessions": affected_rows, "reason": "service_restart"}
-                )
-            except Exception as apm_error:
-                print(f"⚠️ APM logging failed: {apm_error}")
-            
     except Exception as e:
         error_msg = f"❌ Error during session cleanup on startup: {e}"
         print(error_msg)
         logger.error(error_msg)
-        try:
-            elasticapm.capture_exception()
-        except Exception as apm_error:
-            print(f"⚠️ APM exception capture failed: {apm_error}")
         try:
             if conn:
                 conn.rollback()
@@ -332,18 +318,12 @@ async def health_check():
                 # Don't fail health check due to cleanup failure, but retry next time
         
         # Regular health check
-        with elasticapm.capture_span('database_health_check'):
-            conn = get_db_connection()
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-            conn.close()
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        conn.close()
         
-        elasticapm.label(
-            health_status="healthy", 
-            database_status="connected",
-            startup_cleanup_done=_startup_cleanup_done
-        )
         return {
             "status": "healthy", 
             "database": "connected",
@@ -351,8 +331,6 @@ async def health_check():
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        elasticapm.label(health_status="unhealthy", database_status="disconnected")
-        elasticapm.capture_exception()
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 @app.post("/verify", response_model=AuthResponse)
@@ -364,10 +342,7 @@ async def verify_credentials(
 ):
     """
     Verify user credentials and return authentication response
-    """
-    # Add APM labels
-    elasticapm.label(username=request.username, force_login=request.force_login)
-    
+    """    
     logger.info(f"Authentication attempt for username: {request.username}, force_login: {request.force_login}")
     
     # Get client IP and user agent (would be passed from gateway)
@@ -375,42 +350,32 @@ async def verify_credentials(
     client_user_agent = user_agent or "unknown"
     request_id = x_request_id or "unknown"
     
-    # Add more APM context
-    elasticapm.label(client_ip=client_ip, request_id=request_id)
-    
     try:
         # Get user with roles
-        with elasticapm.capture_span('database_user_lookup'):
-            user = get_user_with_roles(request.username)
+        user = get_user_with_roles(request.username)
         
         if not user:
             logger.warning(f"User not found: {request.username}")
-            elasticapm.label(auth_result="user_not_found")
             log_auth_attempt(None, request.username, False, client_ip, client_user_agent, request_id, "user_not_found")
             return AuthResponse(ok=False)
         
         # Check if user is active
         if not user['is_active']:
             logger.warning(f"Inactive user login attempt: {request.username}")
-            elasticapm.label(auth_result="user_inactive")
             log_auth_attempt(user['id'], request.username, False, client_ip, client_user_agent, request_id, "user_inactive")
             return AuthResponse(ok=False)
         
         # Verify password
-        with elasticapm.capture_span('password_verification'):
-            if not verify_password(request.password, user['password_hash']):
-                logger.warning(f"Invalid password for user: {request.username}")
-                elasticapm.label(auth_result="invalid_password")
-                log_auth_attempt(user['id'], request.username, False, client_ip, client_user_agent, request_id, "invalid_password")
-                return AuthResponse(ok=False)
+        if not verify_password(request.password, user['password_hash']):
+            logger.warning(f"Invalid password for user: {request.username}")
+            log_auth_attempt(user['id'], request.username, False, client_ip, client_user_agent, request_id, "invalid_password")
+            return AuthResponse(ok=False)
         
         # Check for existing active session
-        with elasticapm.capture_span('session_conflict_check'):
-            existing_session = check_existing_session(user['id'])
+        existing_session = check_existing_session(user['id'])
         
         if existing_session and not request.force_login:
             logger.info(f"Session conflict detected for user: {request.username}")
-            elasticapm.label(auth_result="session_conflict")
             log_auth_attempt(user['id'], request.username, False, client_ip, client_user_agent, request_id, "session_conflict")
             return AuthResponse(
                 ok=False,
@@ -424,17 +389,14 @@ async def verify_credentials(
         
         # If force login is requested, terminate existing sessions
         if existing_session and request.force_login:
-            with elasticapm.capture_span('session_termination'):
-                terminate_user_sessions(user['id'], "Forced login from new session")
+            terminate_user_sessions(user['id'], "Forced login from new session")
             logger.info(f"Forced login - terminated existing session for user: {request.username}")
-            elasticapm.label(forced_login=True)
         
         # Generate new session
         session_id = generate_session_id()
         
         # Success - create session (JWT hash will be provided later by login service)
         logger.info(f"Successful authentication for user: {request.username}")
-        elasticapm.label(auth_result="success", user_id=str(user['id']), user_roles=",".join(user['roles'] or []))
         log_auth_attempt(user['id'], request.username, True, client_ip, client_user_agent, request_id)
         
         return AuthResponse(
@@ -446,8 +408,6 @@ async def verify_credentials(
         
     except Exception as e:
         logger.error(f"Authentication error: {e}")
-        elasticapm.label(auth_result="system_error")
-        elasticapm.capture_exception()
         log_auth_attempt(None, request.username, False, client_ip, client_user_agent, request_id, f"system_error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal authentication error")
 
@@ -464,28 +424,20 @@ async def create_user_session(request: SessionRequest):
     """
     Create a new active session record after JWT generation
     """
-    # Add APM labels
-    elasticapm.label(user_id=request.user_id, session_id=request.session_id)
-    
     try:
-        with elasticapm.capture_span('jwt_hash_generation'):
-            jwt_hash = hash_token(request.jwt_token)
+        jwt_hash = hash_token(request.jwt_token)
         
-        with elasticapm.capture_span('database_session_create'):
-            create_session(
-                request.user_id, 
-                request.session_id, 
-                jwt_hash, 
-                request.ip_address, 
-                request.user_agent
-            )
+        create_session(
+            request.user_id, 
+            request.session_id, 
+            jwt_hash, 
+            request.ip_address, 
+            request.user_agent
+        )
         
-        elasticapm.label(session_create_result="success")
         return {"success": True, "message": "Session created successfully"}
     except Exception as e:
         logger.error(f"Error creating session: {e}")
-        elasticapm.label(session_create_result="error")
-        elasticapm.capture_exception()
         raise HTTPException(status_code=500, detail="Failed to create session")
 
 # Session validation endpoint
@@ -532,41 +484,29 @@ async def logout_user(request: LogoutRequest):
     """
     Terminate user session(s) and log the logout event
     """
-    # Add APM labels
-    elasticapm.label(
-        user_id=request.user_id, 
-        terminate_all=request.terminate_all_sessions,
-        session_id=request.session_id or "all"
-    )
-    
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             if request.terminate_all_sessions or not request.session_id:
                 # Terminate all active sessions for the user
-                with elasticapm.capture_span('terminate_all_sessions'):
-                    cursor.execute("""
-                        UPDATE active_sessions 
-                        SET is_active = FALSE, terminated_reason = %s, terminated_at = NOW()
-                        WHERE user_id = %s AND is_active = TRUE
-                    """, ("User logout", request.user_id))
-                    affected_rows = cursor.rowcount
-                    elasticapm.label(sessions_terminated=affected_rows)
-                    logger.info(f"Terminated {affected_rows} sessions for user {request.user_id}")
+                cursor.execute("""
+                    UPDATE active_sessions 
+                    SET is_active = FALSE, terminated_reason = %s, terminated_at = NOW()
+                    WHERE user_id = %s AND is_active = TRUE
+                """, ("User logout", request.user_id))
+                affected_rows = cursor.rowcount
+                logger.info(f"Terminated {affected_rows} sessions for user {request.user_id}")
             else:
                 # Terminate specific session
-                with elasticapm.capture_span('terminate_specific_session'):
-                    cursor.execute("""
-                        UPDATE active_sessions 
-                        SET is_active = FALSE, terminated_reason = %s, terminated_at = NOW()
-                        WHERE user_id = %s AND session_id = %s AND is_active = TRUE
-                    """, ("User logout", request.user_id, request.session_id))
-                    affected_rows = cursor.rowcount
-                    elasticapm.label(sessions_terminated=affected_rows)
-                    logger.info(f"Terminated session {request.session_id} for user {request.user_id}")
+                cursor.execute("""
+                    UPDATE active_sessions 
+                    SET is_active = FALSE, terminated_reason = %s, terminated_at = NOW()
+                    WHERE user_id = %s AND session_id = %s AND is_active = TRUE
+                """, ("User logout", request.user_id, request.session_id))
+                affected_rows = cursor.rowcount
+                logger.info(f"Terminated session {request.session_id} for user {request.user_id}")
             
             conn.commit()
-            elasticapm.label(logout_result="success")
             
             return {
                 "success": True, 
@@ -575,8 +515,6 @@ async def logout_user(request: LogoutRequest):
             }
     except Exception as e:
         logger.error(f"Logout error: {e}")
-        elasticapm.label(logout_result="error")
-        elasticapm.capture_exception()
         conn.rollback()
         raise HTTPException(status_code=500, detail="Logout failed")
     finally:

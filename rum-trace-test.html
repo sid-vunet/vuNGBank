@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RUM Trace Propagation Test</title>
+    <script src="https://unpkg.com/@elastic/apm-rum@5.12.1/dist/bundles/elastic-apm-rum.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test-section { margin: 20px 0; padding: 20px; background: #f5f5f5; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 3px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: white; padding: 10px; border: 1px solid #ddd; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 RUM to Payment Service Trace Propagation Test</h1>
+    
+    <div class="test-section">
+        <h3>1. RUM Agent Status</h3>
+        <div id="rum-status" class="result info">Initializing...</div>
+        <button onclick="checkRumStatus()">Check RUM Agent</button>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Test Trace Propagation</h3>
+        <div id="trace-test-result" class="result info">Ready to test</div>
+        <button onclick="testTraceToPaymentService()">Send Traced Payment Request</button>
+        <button onclick="checkCurrentTransaction()">Check Current Transaction</button>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Transaction Details</h3>
+        <pre id="transaction-details">Click "Check Current Transaction" to see active transaction details</pre>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Test Results</h3>
+        <div id="final-results" class="result info">
+            This test will verify that:
+            <ul>
+                <li>RUM agent is properly initialized</li>
+                <li>HTTP requests include trace headers (traceparent, tracestate)</li>
+                <li>Payment service receives and continues the trace</li>
+                <li>End-to-end transaction processing works</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Initialize RUM agent with same config as main app
+        let apm;
+        
+        try {
+            apm = elasticApm.init({
+                serviceName: 'vubank-frontend',
+                serverUrl: 'http://91.203.133.240:30200',
+                environment: 'development',
+                distributedTracingOrigins: [
+                    'http://localhost:8000',
+                    'http://localhost:8001', 
+                    'http://localhost:8002',
+                    'http://localhost:8003',
+                    'http://localhost:8004',
+                    'http://localhost:8005'
+                ],
+                active: true,
+                logLevel: 'debug'
+            });
+            
+            document.getElementById('rum-status').innerHTML = '<strong>✅ RUM Agent Initialized Successfully</strong>';
+            document.getElementById('rum-status').className = 'result success';
+        } catch (error) {
+            document.getElementById('rum-status').innerHTML = '<strong>❌ RUM Agent Failed to Initialize:</strong><br>' + error.message;
+            document.getElementById('rum-status').className = 'result error';
+        }
+
+        function checkRumStatus() {
+            const status = document.getElementById('rum-status');
+            
+            if (!apm) {
+                status.innerHTML = '❌ RUM Agent not available';
+                status.className = 'result error';
+                return;
+            }
+
+            try {
+                const config = apm.getConfig();
+                const isActive = apm.isActive();
+                
+                status.innerHTML = `
+                    <strong>RUM Agent Status:</strong><br>
+                    Active: ${isActive ? '✅ Yes' : '❌ No'}<br>
+                    Service Name: ${config.serviceName}<br>
+                    Server URL: ${config.serverUrl}<br>
+                    Distributed Tracing: ${config.distributedTracingOrigins ? '✅ Enabled' : '❌ Disabled'}<br>
+                    Origins: ${config.distributedTracingOrigins ? config.distributedTracingOrigins.join(', ') : 'None'}
+                `;
+                status.className = 'result success';
+            } catch (error) {
+                status.innerHTML = '❌ Error checking RUM status: ' + error.message;
+                status.className = 'result error';
+            }
+        }
+
+        function checkCurrentTransaction() {
+            const details = document.getElementById('transaction-details');
+            
+            if (!apm) {
+                details.textContent = 'RUM Agent not available';
+                return;
+            }
+
+            try {
+                const currentTransaction = apm.getCurrentTransaction();
+                
+                if (currentTransaction) {
+                    details.textContent = JSON.stringify({
+                        name: currentTransaction.name,
+                        type: currentTransaction.type,
+                        id: currentTransaction.id,
+                        traceId: currentTransaction.traceId,
+                        sampled: currentTransaction.sampled
+                    }, null, 2);
+                } else {
+                    details.textContent = 'No active transaction. Start one with "Send Traced Payment Request"';
+                }
+            } catch (error) {
+                details.textContent = 'Error getting transaction: ' + error.message;
+            }
+        }
+
+        async function testTraceToPaymentService() {
+            const resultDiv = document.getElementById('trace-test-result');
+            resultDiv.innerHTML = '🔄 Testing trace propagation...';
+            resultDiv.className = 'result info';
+
+            if (!apm) {
+                resultDiv.innerHTML = '❌ RUM Agent not available';
+                resultDiv.className = 'result error';
+                return;
+            }
+
+            try {
+                // Start a RUM transaction for this test
+                const transaction = apm.startTransaction('rum-trace-test', 'user-interaction');
+                
+                // Add some context
+                transaction.addLabels({
+                    testType: 'trace-propagation',
+                    targetService: 'payment-process-java-service'
+                });
+
+                // First get JWT token
+                const loginResponse = await fetch('http://localhost:8000/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Client': 'web-portal',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Origin': 'http://localhost:3000'
+                    },
+                    body: JSON.stringify({
+                        username: 'sidharth',
+                        password: 'password123',
+                        force_login: true
+                    })
+                });
+
+                const loginData = await loginResponse.json();
+                const token = loginData.token;
+
+                if (!token) {
+                    throw new Error('Failed to get JWT token');
+                }
+
+                // Create payment XML
+                const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<PaymentInstruction>
+    <PayeeName>RUM Browser Test Payee</PayeeName>
+    <IFSCCode>SBIN0000456</IFSCCode>
+    <PaymentType>NEFT</PaymentType>
+    <DateTime>2025-09-18T08:00:00Z</DateTime>
+    <CustomerName>sidharth</CustomerName>
+    <FromAccountNo>1001234567893</FromAccountNo>
+    <ToAccountNo>2234567890123789</ToAccountNo>
+    <BranchName>RUM Test Branch</BranchName>
+    <Amount>75.50</Amount>
+    <Comments>Testing RUM trace propagation from browser</Comments>
+</PaymentInstruction>`;
+
+                // Send payment request - RUM should automatically add trace headers
+                const paymentResponse = await fetch('http://localhost:8004/payments/transfer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'Authorization': `Bearer ${token}`,
+                        'X-Request-Id': `rum-browser-test-${Date.now()}`,
+                        'X-Api-Client': 'web-portal'
+                    },
+                    body: xmlPayload
+                });
+
+                const paymentData = await paymentResponse.json();
+
+                // End the transaction
+                transaction.end();
+
+                // Update results
+                if (paymentResponse.ok) {
+                    resultDiv.innerHTML = `
+                        <strong>✅ Trace Propagation Test Successful!</strong><br>
+                        Payment Status: ${paymentResponse.status}<br>
+                        Transaction Reference: ${paymentData.txnRef}<br>
+                        Processing Status: ${paymentData.status}<br>
+                        <br>
+                        <strong>RUM Transaction Details:</strong><br>
+                        Transaction ID: ${transaction.id}<br>
+                        Trace ID: ${transaction.traceId}<br>
+                        <br>
+                        <em>Check APM Dashboard for distributed trace visualization!</em>
+                    `;
+                    resultDiv.className = 'result success';
+                } else {
+                    throw new Error(`Payment request failed: ${paymentResponse.status}`);
+                }
+
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Test failed: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Auto-check RUM status when page loads
+        window.addEventListener('load', () => {
+            setTimeout(checkRumStatus, 1000);
+        });
+    </script>
+</body>
+</html>

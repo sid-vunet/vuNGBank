@@ -1,7 +1,5 @@
 package com.vubank.core.service;
 
-import co.elastic.apm.api.ElasticApm;
-import co.elastic.apm.api.Span;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,11 +68,6 @@ public class AccountsService {
      * Update account balance by debiting the specified amount
      */
     public boolean debitAccount(String accountNumber, BigDecimal amount, String referenceNumber, String description, String userAuthorization) {
-        Span span = ElasticApm.currentSpan().startSpan("accounts", "http", "debit-account");
-        span.addLabel("account-number", accountNumber);
-        span.addLabel("amount", amount.toString());
-        span.addLabel("reference-number", referenceNumber);
-        
         try {
             // Create request payload
             Map<String, Object> request = new HashMap<>();
@@ -87,24 +80,6 @@ public class AccountsService {
             // Create headers with user's JWT token
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
-            // Add distributed tracing headers
-            Transaction currentTransaction = ElasticApm.currentTransaction();
-            if (currentTransaction != null) {
-                try {
-                    // Get trace context and add headers for distributed tracing
-                    String traceId = currentTransaction.getTraceId();
-                    String spanId = span.getId();
-                    if (traceId != null && spanId != null) {
-                        String traceparent = String.format("00-%s-%s-01", traceId, spanId);
-                        headers.set("traceparent", traceparent);
-                        headers.set("tracestate", "vubank=corebanking-service");
-                        logger.debug("Adding distributed tracing headers: traceparent={}", traceparent);
-                    }
-                } catch (Exception e) {
-                    logger.warn("Failed to add distributed tracing headers: {}", e.getMessage());
-                }
-            }
             
             if (userAuthorization != null && !userAuthorization.trim().isEmpty()) {
                 headers.set("Authorization", userAuthorization);
@@ -140,7 +115,6 @@ public class AccountsService {
                 Boolean success = (Boolean) responseBody.get("success");
                 
                 if (Boolean.TRUE.equals(success)) {
-                    span.addLabel("result", "success");
                     // Handle numeric types safely - they might come as different types from JSON
                     Number oldBalanceNum = (Number) responseBody.get("oldBalance");
                     Number newBalanceNum = (Number) responseBody.get("newBalance");
@@ -171,24 +145,18 @@ public class AccountsService {
                     
                     return true;
                 } else {
-                    span.addLabel("result", "business-error");
                     String message = (String) responseBody.get("message");
                     logger.warn("Failed to debit account {}: {}", accountNumber, message);
                     return false;
                 }
             } else {
-                span.addLabel("result", "http-error");
                 logger.error("Accounts service returned status {}", response.getStatusCode());
                 return false;
             }
 
         } catch (Exception e) {
-            span.addLabel("result", "exception");
             logger.error("Error calling accounts service to debit account {}", accountNumber, e);
-            ElasticApm.captureException(e);
             return false;
-        } finally {
-            span.end();
         }
     }
 
@@ -196,11 +164,6 @@ public class AccountsService {
      * Update account balance by crediting the specified amount (for future use)
      */
     public boolean creditAccount(String accountNumber, BigDecimal amount, String referenceNumber, String description) {
-        Span span = ElasticApm.currentSpan().startSpan("accounts", "http", "credit-account");
-        span.addLabel("account-number", accountNumber);
-        span.addLabel("amount", amount.toString());
-        span.addLabel("reference-number", referenceNumber);
-        
         try {
             // Create request payload
             Map<String, Object> request = new HashMap<>();
@@ -234,7 +197,6 @@ public class AccountsService {
                 Boolean success = (Boolean) responseBody.get("success");
                 
                 if (Boolean.TRUE.equals(success)) {
-                    span.addLabel("result", "success");
                     // Handle numeric types safely - they might come as different types from JSON
                     Number oldBalanceNum = (Number) responseBody.get("oldBalance");
                     Number newBalanceNum = (Number) responseBody.get("newBalance");
@@ -248,24 +210,18 @@ public class AccountsService {
                                accountNumber, oldBalance, newBalance, transactionId);
                     return true;
                 } else {
-                    span.addLabel("result", "business-error");
                     String message = (String) responseBody.get("message");
                     logger.warn("Failed to credit account {}: {}", accountNumber, message);
                     return false;
                 }
             } else {
-                span.addLabel("result", "http-error");
                 logger.error("Accounts service returned status {}", response.getStatusCode());
                 return false;
             }
 
         } catch (Exception e) {
-            span.addLabel("result", "exception");
             logger.error("Error calling accounts service to credit account {}", accountNumber, e);
-            ElasticApm.captureException(e);
             return false;
-        } finally {
-            span.end();
         }
     }
 
@@ -275,12 +231,6 @@ public class AccountsService {
     public boolean recordTransaction(String accountNumber, String transactionType, BigDecimal amount, 
                                    String description, String referenceNumber, BigDecimal balanceAfter, 
                                    String status, String userAuthorization) {
-        Span span = ElasticApm.currentSpan().startSpan("accounts", "http", "record-transaction");
-        span.addLabel("account-number", accountNumber);
-        span.addLabel("transaction-type", transactionType);
-        span.addLabel("amount", amount.toString());
-        span.addLabel("reference-number", referenceNumber);
-        
         try {
             // Create request payload
             Map<String, Object> request = new HashMap<>();
@@ -295,24 +245,6 @@ public class AccountsService {
             // Create headers with user's JWT token
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
-            // Add distributed tracing headers
-            Transaction currentTransaction = ElasticApm.currentTransaction();
-            if (currentTransaction != null) {
-                try {
-                    // Get trace context and add headers for distributed tracing
-                    String traceId = currentTransaction.getTraceId();
-                    String spanId = span.getId();
-                    if (traceId != null && spanId != null) {
-                        String traceparent = String.format("00-%s-%s-01", traceId, spanId);
-                        headers.set("traceparent", traceparent);
-                        headers.set("tracestate", "vubank=corebanking-transaction");
-                        logger.debug("Adding distributed tracing headers for transaction recording: traceparent={}", traceparent);
-                    }
-                } catch (Exception e) {
-                    logger.warn("Failed to add distributed tracing headers: {}", e.getMessage());
-                }
-            }
             
             if (userAuthorization != null && !userAuthorization.trim().isEmpty()) {
                 headers.set("Authorization", userAuthorization);
@@ -348,7 +280,6 @@ public class AccountsService {
                 Boolean success = (Boolean) responseBody.get("success");
                 
                 if (Boolean.TRUE.equals(success)) {
-                    span.addLabel("result", "success");
                     // Handle numeric types safely - they might come as different types from JSON
                     Number transactionIdNum = (Number) responseBody.get("transactionId");
                     Integer transactionId = transactionIdNum != null ? transactionIdNum.intValue() : null;
@@ -358,24 +289,18 @@ public class AccountsService {
                                accountNumber, transactionId, message);
                     return true;
                 } else {
-                    span.addLabel("result", "business-error");
                     String message = (String) responseBody.get("message");
                     logger.warn("Failed to record transaction for account {}: {}", accountNumber, message);
                     return false;
                 }
             } else {
-                span.addLabel("result", "http-error");
                 logger.error("Accounts service returned status {} for transaction recording", response.getStatusCode());
                 return false;
             }
 
         } catch (Exception e) {
-            span.addLabel("result", "exception");
             logger.error("Error calling accounts service to record transaction for account {}", accountNumber, e);
-            ElasticApm.captureException(e);
             return false;
-        } finally {
-            span.end();
         }
     }
 }

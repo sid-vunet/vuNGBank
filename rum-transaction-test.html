@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>RUM Transaction Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .test-section { margin: 20px 0; padding: 20px; background: #f5f5f5; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 3px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: white; padding: 10px; border: 1px solid #ddd; overflow: auto; }
+        .log { font-family: monospace; background: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 3px solid #007bff; }
+    </style>
+    
+    <!-- Load Elastic APM RUM locally -->
+    <script src="./elastic-apm-rum.js" 
+            onload="console.log('✅ Elastic APM RUM loaded successfully from local file')" 
+            onerror="console.error('❌ Failed to load local Elastic APM RUM file')"></script>
+</head>
+<body>
+    <h1>🔍 RUM Transaction Debug Test</h1>
+    
+    <div class="test-section">
+        <h3>0. Library Status Check</h3>
+        <button onclick="checkLibraryStatus()">🔍 Check if elasticApm is loaded</button>
+        <div id="library-status" class="result info">Click button to check library status</div>
+    </div>
+    
+    <div class="test-section">
+        <h3>1. RUM Initialization Status</h3>
+        <div id="rum-status" class="result info">Initializing...</div>
+        <button onclick="checkRumStatus()">Check Status</button>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Create Login Transaction</h3>
+        <button onclick="testLoginTransaction()">🚀 Create Login Transaction</button>
+        <div id="transaction-result" class="result info">Click button to create transaction</div>
+        <pre id="transaction-details">No transaction created yet</pre>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Debug Log</h3>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <div id="debug-log"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Expected Service Map</h3>
+        <div class="result info">
+            <strong>For service map stitching, you need:</strong>
+            <ul>
+                <li>✅ RUM transaction (user-login) active during fetch call</li>
+                <li>✅ Fetch call to distributedTracingOrigins (localhost:8000)</li>
+                <li>✅ RUM auto-instrumentation adds trace headers</li>
+                <li>✅ Backend continues the trace (same trace ID)</li>
+                <li>✅ Both transactions appear in APM with connection</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let apm;
+        let currentTransaction = null;
+        let logCounter = 0;
+
+        function log(message) {
+            logCounter++;
+            const logDiv = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div class="log">[${timestamp}] ${logCounter}: ${message}</div>`;
+            console.log(`[RUM Test] ${message}`);
+        }
+
+        function clearLogs() {
+            document.getElementById('debug-log').innerHTML = '';
+            logCounter = 0;
+        }
+
+        function checkLibraryStatus() {
+            const statusDiv = document.getElementById('library-status');
+            
+            if (typeof elasticApm === 'undefined') {
+                log('❌ elasticApm is not defined - library failed to load');
+                statusDiv.innerHTML = '❌ elasticApm library NOT loaded - check network connection or CDN availability';
+                statusDiv.className = 'result error';
+                
+                // Try to manually load from jsdelivr
+                log('🔄 Attempting to load from backup CDN...');
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@elastic/apm-rum@5.12.1/dist/bundles/elastic-apm-rum.umd.min.js';
+                script.onload = () => {
+                    log('✅ Successfully loaded from backup CDN');
+                    statusDiv.innerHTML = '✅ elasticApm loaded from backup CDN';
+                    statusDiv.className = 'result success';
+                    initializeRUM();
+                };
+                script.onerror = () => {
+                    log('❌ Backup CDN also failed');
+                    statusDiv.innerHTML = '❌ Both CDNs failed - check internet connection';
+                };
+                document.head.appendChild(script);
+                
+            } else {
+                log('✅ elasticApm is available');
+                statusDiv.innerHTML = `✅ elasticApm library loaded successfully<br>Version: ${elasticApm.version || 'unknown'}`;
+                statusDiv.className = 'result success';
+                
+                if (!apm) {
+                    log('🔧 Library loaded but not initialized, initializing now...');
+                    initializeRUM();
+                }
+            }
+        }
+
+        // Wait for RUM library to load before initializing
+        function initializeRUM() {
+            if (typeof elasticApm === 'undefined') {
+                log('❌ elasticApm is not defined - RUM library not loaded');
+                document.getElementById('rum-status').innerHTML = '❌ RUM Library Not Loaded';
+                document.getElementById('rum-status').className = 'result error';
+                return false;
+            }
+
+            try {
+                log('🔧 Initializing RUM agent...');
+                apm = elasticApm.init({
+                    serviceName: 'vubank-frontend',
+                    serverUrl: 'http://91.203.133.240:30200',
+                    environment: 'development',
+                    distributedTracingOrigins: [
+                        'http://localhost:8000',  // Login service
+                        'http://localhost:8001',
+                        'http://localhost:8002',
+                        'http://localhost:8003',
+                        'http://localhost:8004',
+                        'http://localhost:8005'
+                    ],
+                    active: true,
+                    logLevel: 'debug',
+                    capturePageLoadSpans: true,
+                    disableInstrumentations: [], // Enable all instrumentations
+                    instrumentFetch: true,
+                    // Transaction sampling
+                    transactionSampleRate: 1.0, // Sample all transactions
+                    // Debug configuration
+                    breakdownMetrics: true,
+                    captureHeaders: true,
+                    captureBody: 'all'
+                });
+                
+                log('✅ RUM agent initialized successfully');
+                document.getElementById('rum-status').innerHTML = '✅ RUM Agent Active';
+                document.getElementById('rum-status').className = 'result success';
+                return true;
+
+            } catch (error) {
+                log(`❌ RUM initialization failed: ${error.message}`);
+                document.getElementById('rum-status').innerHTML = `❌ Failed: ${error.message}`;
+                document.getElementById('rum-status').className = 'result error';
+                return false;
+            }
+        }
+
+        function checkRumStatus() {
+            if (typeof elasticApm === 'undefined') {
+                log('❌ elasticApm is still not defined - library loading issue');
+                document.getElementById('rum-status').innerHTML = '❌ elasticApm not available';
+                document.getElementById('rum-status').className = 'result error';
+                return;
+            }
+
+            if (!apm) {
+                log('⚠️ APM instance not initialized, trying to initialize...');
+                if (!initializeRUM()) {
+                    return;
+                }
+            }
+
+            try {
+                const config = apm.getConfig();
+                const isActive = apm.isActive();
+                
+                log(`📊 RUM Status: Active=${isActive}, Service=${config.serviceName}`);
+                log(`📊 Distributed Tracing Origins: ${config.distributedTracingOrigins?.join(', ')}`);
+                
+                const statusDiv = document.getElementById('rum-status');
+                statusDiv.innerHTML = `
+                    <strong>RUM Configuration:</strong><br>
+                    Active: ${isActive ? '✅' : '❌'}<br>
+                    Service: ${config.serviceName}<br>
+                    Server: ${config.serverUrl}<br>
+                    Tracing Origins: ${config.distributedTracingOrigins?.length || 0} configured
+                `;
+                statusDiv.className = 'result success';
+            } catch (error) {
+                log(`❌ Error checking status: ${error.message}`);
+            }
+        }
+
+        async function testLoginTransaction() {
+            if (typeof elasticApm === 'undefined') {
+                log('❌ elasticApm not available');
+                document.getElementById('transaction-result').innerHTML = '❌ RUM library not loaded';
+                document.getElementById('transaction-result').className = 'result error';
+                return;
+            }
+
+            if (!apm) {
+                log('⚠️ APM not initialized, trying to initialize...');
+                if (!initializeRUM()) {
+                    document.getElementById('transaction-result').innerHTML = '❌ Failed to initialize RUM';
+                    document.getElementById('transaction-result').className = 'result error';
+                    return;
+                }
+            }
+
+            try {
+                log('🚀 Starting explicit login transaction test...');
+
+                // Create a explicit transaction for login
+                currentTransaction = apm.startTransaction('user-login-test', 'user-interaction');
+                
+                if (!currentTransaction) {
+                    log('❌ Failed to create transaction');
+                    return;
+                }
+
+                log(`✅ Transaction created - ID: ${currentTransaction.id}, TraceID: ${currentTransaction.traceId}`);
+
+                // Add labels to help identify in APM
+                currentTransaction.addLabels({
+                    test_type: 'rum_debug',
+                    timestamp: new Date().toISOString(),
+                    page: 'rum-transaction-test',
+                    action: 'debug_login'
+                });
+
+                log('📝 Added labels to transaction');
+
+                // Update UI
+                document.getElementById('transaction-result').innerHTML = '✅ Transaction created successfully!';
+                document.getElementById('transaction-result').className = 'result success';
+                
+                document.getElementById('transaction-details').textContent = JSON.stringify({
+                    name: currentTransaction.name,
+                    type: currentTransaction.type,
+                    id: currentTransaction.id,
+                    traceId: currentTransaction.traceId,
+                    sampled: currentTransaction.sampled
+                }, null, 2);
+
+                // Now make a fetch call that should be instrumented
+                log('🌐 Making fetch call to login service...');
+
+                const response = await fetch('http://localhost:8000/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Client': 'web-portal',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Origin': window.location.origin
+                    },
+                    body: JSON.stringify({
+                        username: 'sidharth',
+                        password: 'password123',
+                        force_login: true
+                    })
+                });
+
+                const data = await response.json();
+                log(`📡 API Response: ${response.status} - ${data.token ? 'Token received' : 'No token'}`);
+
+                // Add response info to transaction
+                currentTransaction.addLabels({
+                    api_response_status: response.status,
+                    api_success: response.ok,
+                    token_received: !!data.token
+                });
+
+                // Keep transaction alive for a bit longer
+                log('⏱️  Keeping transaction alive for 2 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // End the transaction
+                log('🏁 Ending transaction...');
+                currentTransaction.end('completed');
+                currentTransaction = null;
+
+                log('🎯 Transaction ended - check APM dashboard for distributed trace!');
+                
+                document.getElementById('transaction-result').innerHTML += '<br><strong>🎯 Transaction completed - check APM dashboard!</strong>';
+
+            } catch (error) {
+                log(`❌ Transaction test failed: ${error.message}`);
+                if (currentTransaction) {
+                    currentTransaction.captureError(error);
+                    currentTransaction.end('error');
+                    currentTransaction = null;
+                }
+                
+                document.getElementById('transaction-result').innerHTML = `❌ Test failed: ${error.message}`;
+                document.getElementById('transaction-result').className = 'result error';
+            }
+        }
+
+        // Auto-start page load transaction
+        window.addEventListener('load', () => {
+            log('📄 Page loaded - checking if RUM library is available...');
+            
+            // Wait a bit for script to load if needed
+            setTimeout(() => {
+                if (typeof elasticApm !== 'undefined') {
+                    log('✅ elasticApm is available, initializing...');
+                    initializeRUM();
+                } else {
+                    log('❌ elasticApm still not available after page load');
+                    // Try to wait a bit more
+                    setTimeout(() => {
+                        if (typeof elasticApm !== 'undefined') {
+                            log('✅ elasticApm loaded after delay, initializing...');
+                            initializeRUM();
+                        } else {
+                            log('❌ elasticApm failed to load - check network connection');
+                        }
+                    }, 2000);
+                }
+            }, 1000);
+        });
+
+        // Also try to initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🏗️ DOM ready - will initialize RUM when scripts load');
+        });
+    </script>
+</body>
+</html>

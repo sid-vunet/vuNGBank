@@ -1,8 +1,5 @@
 package com.vubank.core.controller;
 
-import co.elastic.apm.api.ElasticApm;
-import co.elastic.apm.api.Span;
-import co.elastic.apm.api.Transaction;
 import com.vubank.core.service.PaymentProcessingService;
 import io.jsonwebtoken.Jwts;
 import org.slf4j.Logger;
@@ -45,132 +42,47 @@ public class CoreBankingController {
             @RequestHeader(value = "traceparent", required = false) String traceparent,
             @RequestHeader(value = "tracestate", required = false) String tracestate) {
 
-        // Use current transaction if available (from Spring Boot auto-instrumentation)
-        // instead of starting a new one to preserve distributed tracing
-        Transaction transaction = ElasticApm.currentTransaction();
-        if (transaction != null) {
-            transaction.setName("corebanking-payment-processing");
-            transaction.setType("request");
-        } else {
-            // Fallback to creating new transaction if none exists
-            transaction = ElasticApm.startTransaction();
-            transaction.setName("corebanking-payment-processing");
-            transaction.setType("request");
-        }
-
         // Add context to MDC for logging
         MDC.put("xRequestId", xRequestId);
         MDC.put("xTxnRef", xTxnRef);
         MDC.put("xOriginService", xOriginService);
 
-        // Add labels to APM transaction
-        transaction.addLabel("x-request-id", xRequestId);
-        transaction.addLabel("x-txn-ref", xTxnRef);
-        transaction.addLabel("x-origin-service", xOriginService);
-        transaction.addLabel("service", "corebanking-processor");
-        
-        // Add trace context labels if present
-        if (traceparent != null) {
-            transaction.addLabel("trace-parent", traceparent);
-        }
-        if (tracestate != null) {
-            transaction.addLabel("trace-state", tracestate);
-        }
-
         logger.info("Received payment processing request - xRequestId: {}, xTxnRef: {}, origin: {}", 
                    xRequestId, xTxnRef, xOriginService);
 
         try {
-            // Span for authorization check
-            Span authSpan = transaction.startSpan("corebanking", "security", "authorization-check");
-            try {
-                if (!isAuthorized(authorization)) {
-                    logger.warn("Unauthorized payment processing request for xRequestId: {}", xRequestId);
-                    authSpan.addLabel("auth-result", "unauthorized");
-                    transaction.addLabel("result", "unauthorized");
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(createErrorResponse(xTxnRef, "UNAUTHORIZED", "Invalid authorization"));
-                }
-                authSpan.addLabel("auth-result", "authorized");
-            } finally {
-                authSpan.end();
+            // Authorization check
+            if (!isAuthorized(authorization)) {
+                logger.warn("Unauthorized payment processing request for xRequestId: {}", xRequestId);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(createErrorResponse(xTxnRef, "UNAUTHORIZED", "Invalid authorization"));
             }
 
-            // Span for header validation
-            Span validationSpan = transaction.startSpan("corebanking", "validation", "header-validation");
-            try {
-                if (!"payment-process".equals(xOriginService)) {
-                    logger.warn("Invalid origin service: {} for xRequestId: {}", xOriginService, xRequestId);
-                    validationSpan.addLabel("validation-result", "invalid-origin");
-                    transaction.addLabel("result", "validation-error");
-                    return ResponseEntity.badRequest()
-                        .body(createErrorResponse(xTxnRef, "INVALID_ORIGIN", "Invalid origin service"));
-                }
-                validationSpan.addLabel("validation-result", "valid");
-            } finally {
-                validationSpan.end();
+            // Header validation
+            if (!"payment-process".equals(xOriginService)) {
+                logger.warn("Invalid origin service: {} for xRequestId: {}", xOriginService, xRequestId);
+                return ResponseEntity.badRequest()
+                    .body(createErrorResponse(xTxnRef, "INVALID_ORIGIN", "Invalid origin service"));
             }
 
-            // Extract payment details for APM labels
-            Object amount = paymentRequest.get("amount");
-            Object fromAccount = paymentRequest.get("fromAccountNo");
-            Object toAccount = paymentRequest.get("toAccountNo");
-            
-            if (amount != null) transaction.addLabel("amount", amount.toString());
-            if (fromAccount != null) transaction.addLabel("from-account", fromAccount.toString());
-            if (toAccount != null) transaction.addLabel("to-account", toAccount.toString());
+            // Process payment synchronously (as per the 1.5s simulation requirement)
+            CompletableFuture<PaymentProcessingService.ProcessingResult> futureResult = 
+                paymentProcessingService.processPayment(paymentRequest, authorization);
 
-            // Span for payment processing (core business logic)
-            Span processingSpan = transaction.startSpan("corebanking", "processing", "payment-processing");
-            PaymentProcessingService.ProcessingResult result;
-            try {
-                // Process payment synchronously (as per the 1.5s simulation requirement)
-                CompletableFuture<PaymentProcessingService.ProcessingResult> futureResult = 
-                    paymentProcessingService.processPayment(paymentRequest, authorization);
+            PaymentProcessingService.ProcessingResult result = futureResult.get();
 
-                result = futureResult.get();
-                
-                processingSpan.addLabel("processing-status", result.getStatus());
-                processingSpan.addLabel("cbs-id", result.getCbsId() != null ? result.getCbsId().toString() : "none");
-                
-                if ("APPROVED".equals(result.getStatus())) {
-                    processingSpan.addLabel("outcome", "approved");
-                } else if ("REJECTED".equals(result.getStatus())) {
-                    processingSpan.addLabel("outcome", "rejected");
-                    processingSpan.addLabel("rejection-reason", result.getReason());
-                }
-                
-            } finally {
-                processingSpan.end();
-            }
-
-            // Span for response creation
-            Span responseSpan = transaction.startSpan("corebanking", "serialization", "response-creation");
-            Map<String, Object> response;
-            try {
-                response = createSuccessResponse(result);
-                responseSpan.addLabel("response-type", "success");
-            } finally {
-                responseSpan.end();
-            }
+            Map<String, Object> response = createSuccessResponse(result);
             
             logger.info("Payment processing completed for xRequestId: {} with status: {}", 
                        xRequestId, result.getStatus());
-
-            transaction.addLabel("result", result.getStatus().toLowerCase());
-            transaction.addLabel("final-status", result.getStatus());
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             logger.error("Error processing payment for xRequestId: {}", xRequestId, e);
-            transaction.addLabel("result", "internal-error");
-            transaction.addLabel("error-type", "processing-exception");
-            ElasticApm.captureException(e);
             return ResponseEntity.internalServerError()
                 .body(createErrorResponse(xTxnRef, "INTERNAL_ERROR", "Processing failed: " + e.getMessage()));
         } finally {
-            transaction.end();
             // Clear MDC
             MDC.clear();
         }

@@ -1,8 +1,5 @@
 package com.vubank.payment.controller;
 
-import co.elastic.apm.api.ElasticApm;
-import co.elastic.apm.api.Span;
-import co.elastic.apm.api.Transaction;
 import com.vubank.payment.model.PaymentRequest;
 import com.vubank.payment.model.PaymentResponse;
 import com.vubank.payment.model.TransactionState;
@@ -49,12 +46,9 @@ public class PaymentController {
             @RequestHeader(value = "Content-Type") String contentType,
             @RequestHeader(value = "X-Signature", required = false) String xSignature,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
-
-        // Start APM Transaction
-        Transaction transaction = ElasticApm.startTransaction();
-        transaction.setName("payment-transfer");
-        transaction.setType("request");
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "traceparent", required = false) String traceparent,
+            @RequestHeader(value = "tracestate", required = false) String tracestate) {
 
         // Generate X-Request-Id if not provided
         if (xRequestId == null || xRequestId.trim().isEmpty()) {
@@ -65,119 +59,62 @@ public class PaymentController {
         MDC.put("xRequestId", xRequestId);
         MDC.put("xApiClient", xApiClient);
 
-        // Add labels to APM transaction
-        transaction.addLabel("x-request-id", xRequestId);
-        transaction.addLabel("x-api-client", xApiClient);
-        transaction.addLabel("payment-service", "hazelcast-payment-processor");
-
         logger.info("Received payment transfer request - xRequestId: {}, xApiClient: {}", xRequestId, xApiClient);
 
         try {
-            // Span for header validation
-            Span validationSpan = transaction.startSpan("payment", "validation", "header-validation");
-            try {
-                validateHeaders(xApiClient, contentType, xSignature);
-                validationSpan.addLabel("validation-result", "success");
-            } finally {
-                validationSpan.end();
-            }
+            // Validate headers
+            validateHeaders(xApiClient, contentType, xSignature);
 
             // Handle idempotency if key is provided
             if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
-                Span idempotencySpan = transaction.startSpan("payment", "idempotency", "lock-check");
-                try {
-                    if (!transactionStateService.tryLockTransaction(idempotencyKey)) {
-                        logger.warn("Duplicate request detected for idempotency key: {}", idempotencyKey);
-                        idempotencySpan.addLabel("duplicate-detected", "true");
-                        transaction.addLabel("result", "duplicate");
-                        return ResponseEntity.status(HttpStatus.CONFLICT)
-                            .body(new PaymentResponse(null, "DUPLICATE", "Duplicate request"));
-                    }
-                    idempotencySpan.addLabel("lock-acquired", "true");
-                } finally {
-                    idempotencySpan.end();
+                if (!transactionStateService.tryLockTransaction(idempotencyKey)) {
+                    logger.warn("Duplicate request detected for idempotency key: {}", idempotencyKey);
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(new PaymentResponse(null, "DUPLICATE", "Duplicate request"));
                 }
             }
 
-            // Span for XML parsing
-            Span xmlParsingSpan = transaction.startSpan("payment", "parsing", "xml-to-payment-request");
-            PaymentRequest paymentRequest;
-            try {
-                paymentRequest = xmlParsingService.parseXmlToPaymentRequest(xmlPayload, xRequestId, xApiClient);
-                xmlParsingSpan.addLabel("amount", paymentRequest.getAmount().toString());
-                xmlParsingSpan.addLabel("from-account", paymentRequest.getFromAccountNo());
-                xmlParsingSpan.addLabel("to-account", paymentRequest.getToAccountNo());
-            } finally {
-                xmlParsingSpan.end();
-            }
+            // Parse XML to PaymentRequest
+            PaymentRequest paymentRequest = xmlParsingService.parseXmlToPaymentRequest(xmlPayload, xRequestId, xApiClient);
 
             // Generate transaction reference
             String txnRef = UUID.randomUUID().toString();
-            transaction.addLabel("txn-ref", txnRef);
             MDC.put("txnRef", txnRef);
 
-            // Span for Hazelcast state management
-            Span hazelcastSpan = transaction.startSpan("payment", "hazelcast", "transaction-state-management");
-            try {
-                // Create initial transaction state
-                TransactionState txnState = transactionStateService.createInitialState(txnRef, paymentRequest);
+            // Create initial transaction state
+            TransactionState txnState = transactionStateService.createInitialState(txnRef, paymentRequest);
+            
+            // Set to RECEIVED status
+            txnState.setStatus(TransactionState.Status.RECEIVED);
+            transactionStateService.saveTransactionState(txnState);
+
+            // Move to VALIDATED status
+            transactionStateService.updateTransactionStatus(txnRef, TransactionState.Status.VALIDATED, null);
+
+            // Check balance
+            BigDecimal currentBalance = transactionStateService.getAccountBalance(paymentRequest.getFromAccountNo());
+            
+            if (currentBalance.compareTo(paymentRequest.getAmount()) < 0) {
+                transactionStateService.updateTransactionStatus(txnRef, TransactionState.Status.FAILED, 
+                    "INSUFFICIENT_BALANCE");
                 
-                // Set to RECEIVED status
-                txnState.setStatus(TransactionState.Status.RECEIVED);
-                transactionStateService.saveTransactionState(txnState);
-
-                // Move to VALIDATED status
-                transactionStateService.updateTransactionStatus(txnRef, TransactionState.Status.VALIDATED, null);
-
-                hazelcastSpan.addLabel("initial-status", "received");
-                hazelcastSpan.addLabel("validated-status", "validated");
-            } finally {
-                hazelcastSpan.end();
-            }
-
-            // Span for balance check
-            Span balanceSpan = transaction.startSpan("payment", "validation", "balance-check");
-            try {
-                BigDecimal currentBalance = transactionStateService.getAccountBalance(paymentRequest.getFromAccountNo());
-                balanceSpan.addLabel("current-balance", currentBalance.toString());
-                balanceSpan.addLabel("required-amount", paymentRequest.getAmount().toString());
+                logger.warn("Insufficient balance for txnRef: {} - Required: {}, Available: {}", 
+                           txnRef, paymentRequest.getAmount(), currentBalance);
                 
-                if (currentBalance.compareTo(paymentRequest.getAmount()) < 0) {
-                    transactionStateService.updateTransactionStatus(txnRef, TransactionState.Status.FAILED, 
-                        "INSUFFICIENT_BALANCE");
-                    
-                    logger.warn("Insufficient balance for txnRef: {} - Required: {}, Available: {}", 
-                               txnRef, paymentRequest.getAmount(), currentBalance);
-                    
-                    balanceSpan.addLabel("balance-check-result", "insufficient");
-                    transaction.addLabel("result", "insufficient-balance");
-                    
-                    return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
-                        .body(new PaymentResponse(txnRef, "FAILED", "INSUFFICIENT_BALANCE"));
-                }
-                balanceSpan.addLabel("balance-check-result", "sufficient");
-            } finally {
-                balanceSpan.end();
+                return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                    .body(new PaymentResponse(txnRef, "FAILED", "INSUFFICIENT_BALANCE"));
             }
 
             // Move to IN_PROGRESS status
             transactionStateService.updateTransactionStatus(txnRef, TransactionState.Status.IN_PROGRESS, null);
 
-            // Call CoreBanking service asynchronously with APM context propagation
+            // Call CoreBanking service asynchronously
             CompletableFuture<CoreBankingService.CoreBankingResponse> futureResponse = 
                 coreBankingService.processPayment(txnRef, paymentRequest, authorization);
 
-            // Handle CoreBanking response asynchronously with APM context
+            // Handle CoreBanking response asynchronously
             futureResponse.thenAccept(coreBankingResponse -> {
-                // Propagate APM context to async callback
-                Span asyncSpan = ElasticApm.currentSpan().startSpan("payment", "callback", "corebanking-response");
-                asyncSpan.addLabel("txn-ref", txnRef);
-                try {
-                    handleCoreBankingResponse(txnRef, coreBankingResponse);
-                    asyncSpan.addLabel("corebanking-status", coreBankingResponse.getStatus());
-                } finally {
-                    asyncSpan.end();
-                }
+                handleCoreBankingResponse(txnRef, coreBankingResponse);
             });
 
             // Release idempotency lock if used
@@ -187,29 +124,19 @@ public class PaymentController {
 
             logger.info("Payment initiated successfully - txnRef: {}, amount: {}", txnRef, paymentRequest.getAmount());
 
-            transaction.addLabel("result", "accepted");
-            transaction.addLabel("amount", paymentRequest.getAmount().toString());
-
             // Return immediate response with IN_PROGRESS status
             return ResponseEntity.accepted()
                 .body(new PaymentResponse(txnRef, "IN_PROGRESS"));
 
         } catch (IllegalArgumentException e) {
             logger.error("Validation error for xRequestId: {} - {}", xRequestId, e.getMessage());
-            transaction.addLabel("result", "validation-error");
-            transaction.addLabel("error-type", "validation");
-            ElasticApm.captureException(e);
             return ResponseEntity.badRequest()
                 .body(new PaymentResponse(null, "FAILED", "Validation error: " + e.getMessage()));
         } catch (Exception e) {
             logger.error("Unexpected error for xRequestId: {}", xRequestId, e);
-            transaction.addLabel("result", "internal-error");
-            transaction.addLabel("error-type", "unexpected");
-            ElasticApm.captureException(e);
             return ResponseEntity.internalServerError()
                 .body(new PaymentResponse(null, "FAILED", "Internal server error"));
         } finally {
-            transaction.end();
             // Clear MDC
             MDC.clear();
         }
@@ -217,34 +144,18 @@ public class PaymentController {
 
     @GetMapping("/status/{txnRef}")
     public ResponseEntity<PaymentResponse> getPaymentStatus(@PathVariable String txnRef) {
-        // Start APM Transaction for status check
-        Transaction transaction = ElasticApm.startTransaction();
-        transaction.setName("payment-status-check");
-        transaction.setType("request");
-        transaction.addLabel("txn-ref", txnRef);
-        transaction.addLabel("operation", "status-query");
-
         logger.debug("Status check requested for txnRef: {}", txnRef);
 
         try {
-            // Span for Hazelcast state retrieval
-            Span hazelcastSpan = transaction.startSpan("payment", "hazelcast", "transaction-state-retrieval");
-            TransactionState txnState;
-            try {
-                txnState = transactionStateService.getTransactionState(txnRef);
-                hazelcastSpan.addLabel("state-found", txnState != null ? "true" : "false");
-            } finally {
-                hazelcastSpan.end();
-            }
+            // Get transaction state from Hazelcast
+            TransactionState txnState = transactionStateService.getTransactionState(txnRef);
             
             if (txnState == null) {
                 logger.warn("Transaction not found for txnRef: {}", txnRef);
-                transaction.addLabel("result", "not-found");
                 return ResponseEntity.notFound().build();
             }
 
             PaymentResponse response = new PaymentResponse(txnRef, txnState.getStatus().toString());
-            transaction.addLabel("status", txnState.getStatus().toString());
             
             // Add additional details based on status
             if (txnState.getStatus() == TransactionState.Status.SUCCESS) {
@@ -252,27 +163,16 @@ public class PaymentController {
                 if (txnState.getApprovedAt() != null) {
                     response.setApprovedAt(txnState.getApprovedAt().toString());
                 }
-                transaction.addLabel("cbs-id", txnState.getCbsId());
-                transaction.addLabel("result", "success");
             } else if (txnState.getStatus() == TransactionState.Status.FAILED) {
                 response.setReason(txnState.getFailureReason());
-                transaction.addLabel("failure-reason", txnState.getFailureReason());
-                transaction.addLabel("result", "failed");
-            } else {
-                transaction.addLabel("result", "in-progress");
             }
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             logger.error("Error retrieving status for txnRef: {}", txnRef, e);
-            transaction.addLabel("result", "error");
-            transaction.addLabel("error-type", "status-retrieval");
-            ElasticApm.captureException(e);
             return ResponseEntity.internalServerError()
                 .body(new PaymentResponse(txnRef, "ERROR", "Failed to retrieve status"));
-        } finally {
-            transaction.end();
         }
     }
 

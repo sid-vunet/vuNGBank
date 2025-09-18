@@ -24,44 +24,49 @@ const LoginPage = ({ onLogin }) => {
   const performLogin = async (forceLogin = false) => {
     const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
     
-    const response = await fetch(`${apiUrl}/api/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Origin': window.location.origin,
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-Api-Client': 'web-portal'
-      },
-      body: JSON.stringify({
-        username: formData.username,
-        password: formData.password,
-        force_login: forceLogin
-      })
-    });
-
-    const data = await response.json();
-
-    if (response.status === 409 && data.session_conflict) {
-      // Handle session conflict
-      setSessionConflict(data.existing_session);
-      setShowConfirmDialog(true);
-      return null;
-    }
-
-    if (response.ok && data.token) {
-      // Store JWT token
-      localStorage.setItem('vubank_token', data.token);
-      localStorage.setItem('vubank_user', JSON.stringify(data.user));
-      
-      // Call parent component's onLogin
-      onLogin({
-        ...data.user,
-        token: data.token
+    try {
+      const response = await fetch(`${apiUrl}/api/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin,
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-Api-Client': 'web-portal'
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+          force_login: forceLogin
+        })
       });
-      return true;
-    } else {
-      setError(data.message || 'Login failed. Please check your credentials.');
-      return false;
+
+      const data = await response.json();
+
+      if (response.status === 409 && data.session_conflict) {
+        // Handle session conflict
+        setSessionConflict(data.existing_session);
+        setShowConfirmDialog(true);
+        return null;
+      }
+
+      if (response.ok && data.token) {
+        // Store JWT token
+        localStorage.setItem('vubank_token', data.token);
+        localStorage.setItem('vubank_user', JSON.stringify(data.user));
+        
+        // Call parent component's onLogin
+        onLogin({
+          ...data.user,
+          token: data.token
+        });
+        return true;
+      } else {
+        setError(data.message || 'Login failed. Please check your credentials.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error; // Re-throw to be handled by caller
     }
   };
 

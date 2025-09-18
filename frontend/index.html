@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Elastic RUM Agent -->
-    <script src="https://unpkg.com/@elastic/apm-rum@5.12.0/dist/bundles/elastic-apm-rum.umd.min.js" crossorigin></script>
+    <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
         // Initialize Elastic RUM
         elasticApm.init({
@@ -22,27 +22,16 @@
             // Page-specific configuration
             pageLoadTransactionName: 'index-page-load',
             // Additional configuration
-            distributedTracingOrigins: ['http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 'http://localhost:8003', 'http://localhost:5004'],
+            distributedTracingOrigins: [
+                'vubank-login-service',
+                'http://localhost:8000',
+                'http://localhost:8001',
+                'http://localhost:8002',
+                'http://localhost:8003',
+                'http://localhost:5004'
+            ],
             disableInstrumentations: [],
             logLevel: 'info'
-        });
-        
-        // Set custom user context and labels
-        elasticApm.setUserContext({
-            id: 'anonymous',
-            username: 'anonymous',
-            email: 'anonymous@vubank.com'
-        });
-        
-        elasticApm.addLabels({
-            page: 'index',
-            component: 'landing-page',
-            version: '1.0.0'
-        });
-        
-        // Track page load performance
-        window.addEventListener('load', function() {
-            elasticApm.startTransaction('page-load-complete', 'page-load');
         });
     </script>
     
@@ -181,42 +170,23 @@
             }
             
             init() {
-                // Start RUM transaction for authentication check
-                const authTransaction = elasticApm.startTransaction('auth-check', 'navigation');
-                
                 // Check authentication status
                 const token = localStorage.getItem('vubank_token');
                 const user = localStorage.getItem('vubank_user');
-                
-                // Add custom labels to transaction
-                authTransaction.addLabels({
-                    hasToken: !!token,
-                    hasUser: !!user,
-                    authStatus: (token && user) ? 'authenticated' : 'unauthenticated'
-                });
                 
                 // Simulate loading time for better UX
                 setTimeout(() => {
                     if (token && user) {
                         // User is authenticated, go to dashboard
-                        authTransaction.addLabels({ redirect: 'dashboard' });
                         this.navigateTo('dashboard.html');
                     } else {
                         // User not authenticated, go to login
-                        authTransaction.addLabels({ redirect: 'login' });
                         this.navigateTo('login.html');
                     }
-                    authTransaction.end();
                 }, 1500); // 1.5 second loading animation
             }
             
             navigateTo(page) {
-                // Track navigation event
-                elasticApm.addLabels({
-                    navigation_target: page,
-                    navigation_source: 'index'
-                });
-                
                 window.location.href = page;
             }
         }

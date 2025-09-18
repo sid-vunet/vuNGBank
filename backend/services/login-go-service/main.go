@@ -15,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"go.elastic.co/apm/module/apmgin/v2"
 	"go.elastic.co/apm/module/apmhttp/v2"
-	"go.elastic.co/apm/v2"
 )
 
 // Config struct
@@ -155,6 +154,8 @@ func correlationID() gin.HandlerFunc {
 			requestID = uuid.New().String()
 			c.Header("X-Request-ID", requestID)
 		}
+		// Add service identification header
+		c.Header("X-Service-Name", "vubank-login-service")
 		c.Set("request_id", requestID)
 		c.Next()
 	}
@@ -162,9 +163,7 @@ func correlationID() gin.HandlerFunc {
 
 // Call Python authentication service
 func callAuthService(ctx context.Context, authURL string, username, password string, forceLogin bool, headers map[string]string) (*AuthResponse, error) {
-	span, ctx := apm.StartSpan(ctx, "callAuthService", "external.http")
-	defer span.End()
-
+	// Let APM auto-instrumentation handle HTTP call tracing
 	authReq := AuthRequest{
 		Username:   username,
 		Password:   password,
@@ -209,8 +208,7 @@ func callAuthService(ctx context.Context, authURL string, username, password str
 
 // Create session in auth service
 func createSession(ctx context.Context, authURL, userID, sessionID, jwtToken, ipAddress, userAgent string) error {
-	span, ctx := apm.StartSpan(ctx, "createSession", "external.http")
-	defer span.End()
+	// Let APM auto-instrumentation handle HTTP calls - no custom spans
 
 	sessionReq := map[string]interface{}{
 		"user_id":    userID,
@@ -265,14 +263,6 @@ func generateJWT(userID string, roles []string, jwtSecret string) (string, error
 // Login handler
 func loginHandler(config *Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Debug: Check if APM transaction exists
-		tx := apm.TransactionFromContext(c.Request.Context())
-		if tx != nil {
-			log.Printf("APM Transaction detected: %s", tx.TraceContext().Trace)
-		} else {
-			log.Printf("No APM transaction found in context")
-		}
-
 		requestID := c.GetString("request_id")
 
 		var loginReq LoginRequest
@@ -287,15 +277,6 @@ func loginHandler(config *Config) gin.HandlerFunc {
 
 		log.Printf("Login attempt for user: %s (Request ID: %s)", loginReq.Username, requestID)
 
-		// Debug: Log distributed tracing headers
-		traceparent := c.GetHeader("traceparent")
-		tracestate := c.GetHeader("tracestate")
-		if traceparent != "" || tracestate != "" {
-			log.Printf("Distributed tracing headers - traceparent: %s, tracestate: %s", traceparent, tracestate)
-		} else {
-			log.Printf("No distributed tracing headers found in request")
-		}
-
 		// Prepare headers to forward to auth service
 		headers := map[string]string{
 			"X-Request-ID":    requestID,
@@ -306,31 +287,15 @@ func loginHandler(config *Config) gin.HandlerFunc {
 		// Call Python authentication service
 		authResp, err := callAuthService(c.Request.Context(), config.AuthServiceURL, loginReq.Username, loginReq.Password, loginReq.ForceLogin, headers)
 		if err != nil {
-			// Create span for auth service error
-			span, _ := apm.StartSpan(c.Request.Context(), "auth_service_error", "app.external_service")
-			span.Context.SetLabel("username", loginReq.Username)
-			span.Context.SetLabel("error", err.Error())
-			span.Context.SetLabel("auth_service_url", config.AuthServiceURL)
-			span.Context.SetLabel("response_status", 500)
-			defer span.End()
-
-			log.Printf("Auth service error: %v", err)
+			// Log error but don't create custom spans that might interfere with distributed tracing
+			log.Printf("Auth service error for user %s: %v", loginReq.Username, err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "auth_service_error",
 				Message: "Authentication service unavailable",
 			})
 			return
-		}
-
-		// Check for session conflict
+		} // Check for session conflict
 		if authResp.SessionConflict && !loginReq.ForceLogin {
-			// Create span for session conflict handling
-			span, _ := apm.StartSpan(c.Request.Context(), "session_conflict_handling", "app.business_logic")
-			span.Context.SetLabel("username", loginReq.Username)
-			span.Context.SetLabel("conflict_reason", "existing_session")
-			span.Context.SetLabel("response_status", 409)
-			defer span.End()
-
 			log.Printf("Session conflict for user: %s", loginReq.Username)
 			c.JSON(http.StatusConflict, LoginResponse{
 				SessionConflict: true,
@@ -341,13 +306,6 @@ func loginHandler(config *Config) gin.HandlerFunc {
 
 		// Check authentication result
 		if !authResp.OK || authResp.UserID == nil {
-			// Create span for authentication failure
-			span, _ := apm.StartSpan(c.Request.Context(), "authentication_failure", "app.business_logic")
-			span.Context.SetLabel("username", loginReq.Username)
-			span.Context.SetLabel("failure_reason", "invalid_credentials")
-			span.Context.SetLabel("response_status", 401)
-			defer span.End()
-
 			log.Printf("Authentication failed for user: %s", loginReq.Username)
 			c.JSON(http.StatusUnauthorized, ErrorResponse{
 				Error:   "invalid_credentials",
@@ -366,14 +324,6 @@ func loginHandler(config *Config) gin.HandlerFunc {
 		}
 
 		if !hasValidRole {
-			// Create span for role validation failure
-			span, _ := apm.StartSpan(c.Request.Context(), "role_validation_failure", "app.business_logic")
-			span.Context.SetLabel("username", loginReq.Username)
-			span.Context.SetLabel("user_roles", fmt.Sprintf("%v", authResp.Roles))
-			span.Context.SetLabel("failure_reason", "insufficient_permissions")
-			span.Context.SetLabel("response_status", 403)
-			defer span.End()
-
 			log.Printf("User %s has no valid banking roles", loginReq.Username)
 			c.JSON(http.StatusForbidden, ErrorResponse{
 				Error:   "insufficient_permissions",
@@ -385,15 +335,7 @@ func loginHandler(config *Config) gin.HandlerFunc {
 		// Generate JWT token
 		token, err := generateJWT(*authResp.UserID, authResp.Roles, config.JWTSecret)
 		if err != nil {
-			// Create span for JWT generation failure
-			span, _ := apm.StartSpan(c.Request.Context(), "jwt_generation_failure", "app.business_logic")
-			span.Context.SetLabel("username", loginReq.Username)
-			span.Context.SetLabel("user_id", *authResp.UserID)
-			span.Context.SetLabel("error", err.Error())
-			span.Context.SetLabel("response_status", 500)
-			defer span.End()
-
-			log.Printf("Failed to generate JWT: %v", err)
+			log.Printf("Failed to generate JWT for user %s: %v", loginReq.Username, err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "token_generation_error",
 				Message: "Failed to generate access token",
@@ -412,16 +354,7 @@ func loginHandler(config *Config) gin.HandlerFunc {
 
 		log.Printf("Successful login for user: %s (Request ID: %s)", loginReq.Username, requestID)
 
-		// Create span for successful login
-		span, _ := apm.StartSpan(c.Request.Context(), "successful_login", "app.business_logic")
-		span.Context.SetLabel("username", loginReq.Username)
-		span.Context.SetLabel("user_id", *authResp.UserID)
-		span.Context.SetLabel("roles", fmt.Sprintf("%v", authResp.Roles))
-		span.Context.SetLabel("response_status", 200)
-		span.Context.SetLabel("has_session", authResp.SessionID != "")
-		defer span.End()
-
-		// Return success response
+		// Return success response (let APM auto-instrumentation handle tracing)
 		c.JSON(http.StatusOK, LoginResponse{
 			Token: token,
 			User: User{
@@ -436,12 +369,11 @@ func loginHandler(config *Config) gin.HandlerFunc {
 // Health check handler
 func healthHandler(config *Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		span, ctx := apm.StartSpan(c.Request.Context(), "healthCheck", "app.health")
-		defer span.End()
+		// Let APM auto-instrumentation handle this - no custom spans
 
 		// Check auth service health
 		client := apmhttp.WrapClient(&http.Client{Timeout: 5 * time.Second})
-		req, _ := http.NewRequestWithContext(ctx, "GET", config.AuthServiceURL+"/health", nil)
+		req, _ := http.NewRequestWithContext(c.Request.Context(), "GET", config.AuthServiceURL+"/health", nil)
 		resp, err := client.Do(req)
 		authHealthy := err == nil && resp.StatusCode == http.StatusOK
 		if resp != nil {
@@ -468,15 +400,12 @@ func healthHandler(config *Config) gin.HandlerFunc {
 // Logout handler
 func logoutHandler(config *Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		span, ctx := apm.StartSpan(c.Request.Context(), "user_logout", "app.business_logic")
-		defer span.End()
+		// Let APM auto-instrumentation handle this - no custom spans that break distributed tracing
 
 		requestID := c.GetString("request_id")
 
 		var logoutReq LogoutRequest
 		if err := c.ShouldBindJSON(&logoutReq); err != nil {
-			span.Context.SetLabel("error", err.Error())
-			span.Context.SetLabel("response_status", 400)
 			log.Printf("Invalid logout request body: %v", err)
 			c.JSON(http.StatusBadRequest, ErrorResponse{
 				Error:   "invalid_request",
@@ -499,8 +428,6 @@ func logoutHandler(config *Config) gin.HandlerFunc {
 
 		jsonData, err := json.Marshal(logoutData)
 		if err != nil {
-			span.Context.SetLabel("error", err.Error())
-			span.Context.SetLabel("response_status", 500)
 			log.Printf("Failed to marshal logout request: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "request_marshal_error",
@@ -510,10 +437,8 @@ func logoutHandler(config *Config) gin.HandlerFunc {
 		}
 
 		// Call Python auth service logout endpoint
-		req, err := http.NewRequestWithContext(ctx, "POST", config.AuthServiceURL+"/logout", bytes.NewBuffer(jsonData))
+		req, err := http.NewRequestWithContext(c.Request.Context(), "POST", config.AuthServiceURL+"/logout", bytes.NewBuffer(jsonData))
 		if err != nil {
-			span.Context.SetLabel("error", err.Error())
-			span.Context.SetLabel("response_status", 500)
 			log.Printf("Failed to create logout request: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "request_creation_error",
@@ -530,8 +455,6 @@ func logoutHandler(config *Config) gin.HandlerFunc {
 		client := apmhttp.WrapClient(&http.Client{Timeout: 10 * time.Second})
 		resp, err := client.Do(req)
 		if err != nil {
-			span.Context.SetLabel("error", err.Error())
-			span.Context.SetLabel("response_status", 500)
 			log.Printf("Auth service logout error: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "auth_service_error",
@@ -542,8 +465,6 @@ func logoutHandler(config *Config) gin.HandlerFunc {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			span.Context.SetLabel("auth_service_status", resp.StatusCode)
-			span.Context.SetLabel("response_status", 500)
 			log.Printf("Auth service logout returned status: %d", resp.StatusCode)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "logout_failed",
@@ -554,8 +475,6 @@ func logoutHandler(config *Config) gin.HandlerFunc {
 
 		var logoutResp map[string]interface{}
 		if err := json.NewDecoder(resp.Body).Decode(&logoutResp); err != nil {
-			span.Context.SetLabel("error", err.Error())
-			span.Context.SetLabel("response_status", 500)
 			log.Printf("Failed to decode logout response: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "response_decode_error",
@@ -563,11 +482,6 @@ func logoutHandler(config *Config) gin.HandlerFunc {
 			})
 			return
 		}
-
-		// Add success labels to span
-		span.Context.SetLabel("user_id", logoutReq.UserID)
-		span.Context.SetLabel("sessions_terminated", logoutResp["sessions_terminated"])
-		span.Context.SetLabel("response_status", 200)
 
 		log.Printf("Successful logout for user: %s (Request ID: %s)", logoutReq.UserID, requestID)
 
@@ -606,6 +520,8 @@ func main() {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Api-Client, X-Request-ID, traceparent, tracestate")
+		c.Header("Access-Control-Expose-Headers", "X-Request-ID, X-Service-Name, traceparent, tracestate")
+		c.Header("X-Service-Name", "vubank-login-service") // Add service identification
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)

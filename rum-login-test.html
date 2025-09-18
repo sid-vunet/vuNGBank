@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>RUM Login Transaction Test</title>
+    <script src="https://unpkg.com/@elastic/apm-rum@5.12.1/dist/bundles/elastic-apm-rum.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        .section { margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+        .result { margin: 15px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        button { padding: 12px 24px; margin: 8px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        input[type="text"], input[type="password"] { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+        pre { background: white; padding: 15px; border: 1px solid #ddd; overflow: auto; font-size: 12px; }
+        .transaction-info { background: #e7f3ff; padding: 10px; border-left: 4px solid #007bff; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 RUM Login Transaction Test</h1>
+    <p>This page will generate <strong>real RUM login transactions</strong> that you can see in the APM Dashboard.</p>
+
+    <div class="section">
+        <h3>1. RUM Agent Status</h3>
+        <div id="rum-status" class="result info">Initializing RUM agent...</div>
+        <button onclick="checkRumStatus()">Check RUM Status</button>
+    </div>
+
+    <div class="section">
+        <h3>2. Login Form (Creates RUM Transaction)</h3>
+        <div>
+            <input type="text" id="username" placeholder="Username (try: sidharth)" value="sidharth">
+            <input type="password" id="password" placeholder="Password (try: password123)" value="password123">
+            <br>
+            <button onclick="performRumLogin()">🚀 Login with RUM Transaction</button>
+            <button onclick="startManualTransaction()">📊 Start Manual Transaction</button>
+        </div>
+        <div id="login-result" class="result info">Ready to test RUM login transaction</div>
+    </div>
+
+    <div class="section">
+        <h3>3. Current Transaction Info</h3>
+        <div class="transaction-info">
+            <strong>Active Transaction:</strong>
+            <pre id="transaction-details">No active transaction</pre>
+        </div>
+        <button onclick="checkCurrentTransaction()">Check Current Transaction</button>
+        <button onclick="endCurrentTransaction()">End Current Transaction</button>
+    </div>
+
+    <div class="section">
+        <h3>4. APM Dashboard Instructions</h3>
+        <div class="result warning">
+            <h4>How to see your RUM login transactions:</h4>
+            <ol>
+                <li><strong>Open APM Dashboard:</strong> <a href="http://91.203.133.240:30200" target="_blank">http://91.203.133.240:30200</a></li>
+                <li><strong>Look for service:</strong> <code>vubank-frontend</code></li>
+                <li><strong>Filter by transaction type:</strong> <code>user-login</code> or <code>user-interaction</code></li>
+                <li><strong>Check time range:</strong> Last 15 minutes</li>
+                <li><strong>Look for distributed traces</strong> connecting frontend → login service</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let apm;
+        let currentTransaction = null;
+
+        // Initialize RUM agent
+        try {
+            apm = elasticApm.init({
+                serviceName: 'vubank-frontend',
+                serverUrl: 'http://91.203.133.240:30200',
+                environment: 'development',
+                distributedTracingOrigins: [
+                    'http://localhost:8000',
+                    'http://localhost:8001', 
+                    'http://localhost:8002',
+                    'http://localhost:8003',
+                    'http://localhost:8004',
+                    'http://localhost:8005'
+                ],
+                active: true,
+                logLevel: 'debug',
+                // Capture page loads and route changes
+                capturePageLoadSpans: true
+            });
+
+            document.getElementById('rum-status').innerHTML = '<strong>✅ RUM Agent Initialized Successfully!</strong><br>Service: vubank-frontend<br>Server: http://91.203.133.240:30200';
+            document.getElementById('rum-status').className = 'result success';
+
+        } catch (error) {
+            document.getElementById('rum-status').innerHTML = '<strong>❌ RUM Agent Failed:</strong><br>' + error.message;
+            document.getElementById('rum-status').className = 'result error';
+        }
+
+        function checkRumStatus() {
+            const statusDiv = document.getElementById('rum-status');
+            
+            if (!apm) {
+                statusDiv.innerHTML = '❌ RUM Agent not available';
+                statusDiv.className = 'result error';
+                return;
+            }
+
+            try {
+                const config = apm.getConfig();
+                const isActive = apm.isActive();
+                
+                statusDiv.innerHTML = `
+                    <strong>RUM Agent Status:</strong><br>
+                    Active: ${isActive ? '✅ Yes' : '❌ No'}<br>
+                    Service Name: ${config.serviceName}<br>
+                    Server URL: ${config.serverUrl}<br>
+                    Environment: ${config.environment}<br>
+                    Distributed Tracing: ${config.distributedTracingOrigins ? '✅ Enabled' : '❌ Disabled'}<br>
+                    Origins: ${config.distributedTracingOrigins ? config.distributedTracingOrigins.join(', ') : 'None'}
+                `;
+                statusDiv.className = 'result success';
+            } catch (error) {
+                statusDiv.innerHTML = '❌ Error checking RUM status: ' + error.message;
+                statusDiv.className = 'result error';
+            }
+        }
+
+        function startManualTransaction() {
+            if (!apm) {
+                alert('RUM agent not available');
+                return;
+            }
+
+            try {
+                // End any existing transaction
+                if (currentTransaction) {
+                    currentTransaction.end();
+                }
+
+                // Start a new login transaction
+                currentTransaction = apm.startTransaction('user-login', 'user-interaction');
+                currentTransaction.addLabels({
+                    'page': 'login-test',
+                    'action': 'manual-login',
+                    'component': 'rum-test'
+                });
+
+                updateTransactionDisplay();
+                
+                document.getElementById('login-result').innerHTML = '✅ Manual RUM transaction started! Now perform a login to see distributed tracing.';
+                document.getElementById('login-result').className = 'result success';
+            } catch (error) {
+                document.getElementById('login-result').innerHTML = '❌ Failed to start transaction: ' + error.message;
+                document.getElementById('login-result').className = 'result error';
+            }
+        }
+
+        async function performRumLogin() {
+            const resultDiv = document.getElementById('login-result');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                resultDiv.innerHTML = '❌ Please enter username and password';
+                resultDiv.className = 'result error';
+                return;
+            }
+
+            if (!apm) {
+                resultDiv.innerHTML = '❌ RUM Agent not available';
+                resultDiv.className = 'result error';
+                return;
+            }
+
+            try {
+                resultDiv.innerHTML = '🔄 Performing RUM-tracked login...';
+                resultDiv.className = 'result info';
+
+                // Start a RUM transaction for login
+                const transaction = apm.startTransaction('user-login', 'user-interaction');
+                currentTransaction = transaction;
+                
+                // Add context to the transaction
+                transaction.addLabels({
+                    'username': username,
+                    'login_type': 'web_portal',
+                    'test_type': 'rum_login_transaction',
+                    'page': 'rum-test'
+                });
+
+                // Add user context
+                apm.setUserContext({
+                    id: username,
+                    username: username
+                });
+
+                updateTransactionDisplay();
+
+                // Make the login API call - RUM will automatically add trace headers
+                const response = await fetch('http://localhost:8000/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Client': 'web-portal',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Origin': 'http://localhost:3000',
+                        'X-Request-Id': `rum-login-${Date.now()}`
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        force_login: true
+                    })
+                });
+
+                const loginData = await response.json();
+
+                if (response.ok && loginData.token) {
+                    // Login successful
+                    transaction.addLabels({
+                        'login_result': 'success',
+                        'user_id': loginData.user.id,
+                        'user_roles': loginData.user.roles.join(',')
+                    });
+
+                    // Set user context after successful login
+                    apm.setUserContext({
+                        id: loginData.user.id,
+                        username: loginData.user.username,
+                        email: loginData.user.username
+                    });
+
+                    // End the transaction successfully
+                    transaction.end();
+                    currentTransaction = null;
+
+                    resultDiv.innerHTML = `
+                        <strong>✅ RUM Login Transaction Completed!</strong><br>
+                        User ID: ${loginData.user.id}<br>
+                        Username: ${loginData.user.username}<br>
+                        Roles: ${loginData.user.roles.join(', ')}<br>
+                        Transaction ID: ${transaction.id}<br>
+                        Trace ID: ${transaction.traceId}<br>
+                        <br>
+                        <em>🎯 Check APM Dashboard now for the distributed trace!</em>
+                    `;
+                    resultDiv.className = 'result success';
+                } else {
+                    // Login failed
+                    transaction.addLabels({
+                        'login_result': 'failure',
+                        'error_message': loginData.message || 'Unknown error'
+                    });
+
+                    throw new Error(loginData.message || 'Login failed');
+                }
+
+            } catch (error) {
+                // Mark transaction as failed
+                if (currentTransaction) {
+                    currentTransaction.addLabels({
+                        'login_result': 'error',
+                        'error': error.message
+                    });
+                    currentTransaction.captureError(error);
+                    currentTransaction.end();
+                    currentTransaction = null;
+                }
+
+                resultDiv.innerHTML = `❌ Login failed: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+
+            updateTransactionDisplay();
+        }
+
+        function checkCurrentTransaction() {
+            updateTransactionDisplay();
+        }
+
+        function updateTransactionDisplay() {
+            const detailsDiv = document.getElementById('transaction-details');
+            
+            if (!apm) {
+                detailsDiv.textContent = 'RUM Agent not available';
+                return;
+            }
+
+            try {
+                if (currentTransaction) {
+                    detailsDiv.textContent = JSON.stringify({
+                        name: currentTransaction.name,
+                        type: currentTransaction.type,
+                        id: currentTransaction.id,
+                        traceId: currentTransaction.traceId,
+                        sampled: currentTransaction.sampled,
+                        ended: currentTransaction.ended || false
+                    }, null, 2);
+                } else {
+                    const globalTransaction = apm.getCurrentTransaction();
+                    if (globalTransaction) {
+                        detailsDiv.textContent = JSON.stringify({
+                            name: globalTransaction.name,
+                            type: globalTransaction.type,
+                            id: globalTransaction.id,
+                            traceId: globalTransaction.traceId,
+                            sampled: globalTransaction.sampled
+                        }, null, 2);
+                    } else {
+                        detailsDiv.textContent = 'No active transaction';
+                    }
+                }
+            } catch (error) {
+                detailsDiv.textContent = 'Error getting transaction: ' + error.message;
+            }
+        }
+
+        function endCurrentTransaction() {
+            if (currentTransaction) {
+                currentTransaction.end();
+                currentTransaction = null;
+                updateTransactionDisplay();
+                
+                const resultDiv = document.getElementById('login-result');
+                resultDiv.innerHTML = '✅ Transaction ended manually';
+                resultDiv.className = 'result info';
+            } else {
+                alert('No active transaction to end');
+            }
+        }
+
+        // Auto-check status when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkRumStatus();
+                updateTransactionDisplay();
+            }, 1000);
+        });
+
+        // Capture page load as a transaction
+        window.addEventListener('load', () => {
+            if (apm) {
+                const pageLoadTransaction = apm.startTransaction('page-load-rum-test', 'page-load');
+                pageLoadTransaction.addLabels({
+                    'page': 'rum-login-test',
+                    'url': window.location.href
+                });
+                
+                setTimeout(() => {
+                    pageLoadTransaction.end();
+                }, 100);
+            }
+        });
+    </script>
+</body>
+</html>

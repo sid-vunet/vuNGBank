@@ -14,6 +14,32 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Elastic RUM Agent -->
+    <script src="%PUBLIC_URL%/elastic-apm-rum.js" crossorigin></script>
+    <script>
+        // Initialize Elastic RUM
+        window.elasticApm = elasticApm.init({
+            serviceName: 'vubank-frontend',
+            serverUrl: 'http://91.203.133.240:30200',
+            serviceVersion: '1.0.0',
+            environment: 'production',
+            // Page-specific configuration
+            pageLoadTransactionName: 'react-app-load',
+            // Additional configuration
+            distributedTracingOrigins: ['http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 'http://localhost:8003', 'http://localhost:8004', 'http://localhost:5004'],
+            disableInstrumentations: [],
+            logLevel: 'info',
+            // Enable distributed tracing
+            distributedTracing: true,
+            // Enable instrumentation for fetch
+            instrumentFetch: true,
+            // More verbose logging
+            active: true
+        });
+        
+        console.log('✅ RUM initialized for React app');
+    </script>
+    
     <!-- Prevent FOUC (Flash of Unstyled Content) -->
     <style>
       body {

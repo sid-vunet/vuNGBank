@@ -15,7 +15,6 @@ import (
 	"go.elastic.co/apm/module/apmgin/v2"
 	"go.elastic.co/apm/module/apmsql/v2"
 	_ "go.elastic.co/apm/module/apmsql/v2/pq"
-	"go.elastic.co/apm/v2"
 )
 
 // Config struct
@@ -232,12 +231,6 @@ func jwtMiddleware(jwtSecret string) gin.HandlerFunc {
 
 // Get user accounts
 func getUserAccounts(ctx context.Context, db *sql.DB, userID string) ([]Account, error) {
-	span, ctx := apm.StartSpan(ctx, "database_accounts_lookup", "db.postgresql")
-	defer span.End()
-
-	span.Context.SetLabel("user_id", userID)
-	span.Context.SetLabel("operation", "get_accounts")
-
 	query := `
 		SELECT id, account_number, account_name, account_type, balance, currency, status
 		FROM accounts 
@@ -247,8 +240,6 @@ func getUserAccounts(ctx context.Context, db *sql.DB, userID string) ([]Account,
 
 	rows, err := db.QueryContext(ctx, query, userID)
 	if err != nil {
-		span.Context.SetLabel("query_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 	defer rows.Close()
@@ -266,33 +257,19 @@ func getUserAccounts(ctx context.Context, db *sql.DB, userID string) ([]Account,
 			&account.Status,
 		)
 		if err != nil {
-			span.Context.SetLabel("scan_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			return nil, err
 		}
 		accounts = append(accounts, account)
 	}
 
-	span.Context.SetLabel("query_result", "success")
-	span.Context.SetLabel("accounts_count", len(accounts))
 	return accounts, nil
 }
 
 // Update account balance and create transaction record
 func updateAccountBalance(ctx context.Context, db *sql.DB, request UpdateBalanceRequest) (*UpdateBalanceResponse, error) {
-	span, ctx := apm.StartSpan(ctx, "database_balance_update", "db.postgresql")
-	defer span.End()
-
-	span.Context.SetLabel("account_number", request.AccountNumber)
-	span.Context.SetLabel("amount", request.Amount)
-	span.Context.SetLabel("transaction_type", request.TransactionType)
-	span.Context.SetLabel("reference_number", request.ReferenceNumber)
-
 	// Start database transaction
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		span.Context.SetLabel("tx_result", "begin_error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 	defer tx.Rollback()
@@ -306,14 +283,11 @@ func updateAccountBalance(ctx context.Context, db *sql.DB, request UpdateBalance
 	err = tx.QueryRowContext(ctx, query, request.AccountNumber).Scan(&accountID, &currentBalance, &accountStatus)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			span.Context.SetLabel("account_result", "not_found")
 			return &UpdateBalanceResponse{
 				Success: false,
 				Message: "Account not found or inactive",
 			}, nil
 		}
-		span.Context.SetLabel("account_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 
@@ -322,7 +296,6 @@ func updateAccountBalance(ctx context.Context, db *sql.DB, request UpdateBalance
 
 	// Check for sufficient funds (only for debit operations)
 	if request.Amount < 0 && newBalance < 0 {
-		span.Context.SetLabel("balance_result", "insufficient_funds")
 		return &UpdateBalanceResponse{
 			Success:    false,
 			OldBalance: currentBalance,
@@ -334,8 +307,6 @@ func updateAccountBalance(ctx context.Context, db *sql.DB, request UpdateBalance
 	updateQuery := `UPDATE accounts SET balance = $1 WHERE id = $2`
 	_, err = tx.ExecContext(ctx, updateQuery, newBalance, accountID)
 	if err != nil {
-		span.Context.SetLabel("update_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 
@@ -351,23 +322,14 @@ func updateAccountBalance(ctx context.Context, db *sql.DB, request UpdateBalance
 		accountID, request.TransactionType, request.Amount,
 		request.Description, request.ReferenceNumber, newBalance).Scan(&transactionID)
 	if err != nil {
-		span.Context.SetLabel("transaction_insert_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 
 	// Commit transaction
 	err = tx.Commit()
 	if err != nil {
-		span.Context.SetLabel("commit_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
-
-	span.Context.SetLabel("update_result", "success")
-	span.Context.SetLabel("old_balance", currentBalance)
-	span.Context.SetLabel("new_balance", newBalance)
-	span.Context.SetLabel("transaction_id", transactionID)
 
 	return &UpdateBalanceResponse{
 		Success:       true,
@@ -380,12 +342,6 @@ func updateAccountBalance(ctx context.Context, db *sql.DB, request UpdateBalance
 
 // Get recent transactions for user
 func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Transaction, error) {
-	span, ctx := apm.StartSpan(ctx, "database_transactions_lookup", "db.postgresql")
-	defer span.End()
-
-	span.Context.SetLabel("user_id", userID)
-	span.Context.SetLabel("operation", "get_recent_transactions")
-
 	query := `
 		SELECT t.id, t.transaction_type, t.amount, t.description, 
 			   t.reference_number, t.transaction_date, t.balance_after, t.status
@@ -398,8 +354,6 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 
 	rows, err := db.QueryContext(ctx, query, userID)
 	if err != nil {
-		span.Context.SetLabel("query_result", "error")
-		apm.CaptureError(ctx, err).Send()
 		return nil, err
 	}
 	defer rows.Close()
@@ -420,8 +374,6 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 			&transaction.Status,
 		)
 		if err != nil {
-			span.Context.SetLabel("scan_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			return nil, err
 		}
 
@@ -429,8 +381,6 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 		transactions = append(transactions, transaction)
 	}
 
-	span.Context.SetLabel("query_result", "success")
-	span.Context.SetLabel("transactions_count", len(transactions))
 	return transactions, nil
 }
 
@@ -438,34 +388,13 @@ func getRecentTransactions(ctx context.Context, db *sql.DB, userID string) ([]Tr
 func accountsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
-		rolesInterface, exists := c.Get("roles")
-		var roles []string
-		if exists {
-			if rolesSlice, ok := rolesInterface.([]string); ok {
-				roles = rolesSlice
-			}
-		}
-
-		// Create APM transaction
-		tx := apm.TransactionFromContext(c.Request.Context())
-		if tx != nil {
-			tx.Context.SetLabel("user_id", userID)
-			tx.Context.SetLabel("endpoint", "accounts")
-			tx.Context.SetLabel("user_roles", strings.Join(roles, ","))
-		}
 
 		log.Printf("Fetching accounts for user: %s", userID)
 
-		// Create span for business logic
-		span, ctx := apm.StartSpan(c.Request.Context(), "accounts_business_logic", "app")
-		defer span.End()
-
 		// Get user accounts
-		accounts, err := getUserAccounts(ctx, db, userID)
+		accounts, err := getUserAccounts(c.Request.Context(), db, userID)
 		if err != nil {
 			log.Printf("Failed to get accounts: %v", err)
-			span.Context.SetLabel("accounts_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
 				Message: "Failed to retrieve accounts",
@@ -474,11 +403,9 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Get recent transactions
-		transactions, err := getRecentTransactions(ctx, db, userID)
+		transactions, err := getRecentTransactions(c.Request.Context(), db, userID)
 		if err != nil {
 			log.Printf("Failed to get transactions: %v", err)
-			span.Context.SetLabel("transactions_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
 				Message: "Failed to retrieve transactions",
@@ -490,15 +417,6 @@ func accountsHandler(db *sql.DB) gin.HandlerFunc {
 			UserID:       userID,
 			Accounts:     accounts,
 			Transactions: transactions,
-		}
-
-		span.Context.SetLabel("accounts_result", "success")
-		span.Context.SetLabel("accounts_count", len(accounts))
-		span.Context.SetLabel("transactions_count", len(transactions))
-
-		if tx != nil {
-			tx.Context.SetLabel("response_accounts_count", len(accounts))
-			tx.Context.SetLabel("response_transactions_count", len(transactions))
 		}
 
 		c.JSON(http.StatusOK, response)
@@ -517,28 +435,13 @@ func updateBalanceHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Create APM transaction
-		tx := apm.TransactionFromContext(c.Request.Context())
-		if tx != nil {
-			tx.Context.SetLabel("endpoint", "update_balance")
-			tx.Context.SetLabel("account_number", request.AccountNumber)
-			tx.Context.SetLabel("amount", request.Amount)
-			tx.Context.SetLabel("transaction_type", request.TransactionType)
-		}
-
 		log.Printf("Processing balance update for account: %s, amount: %.2f",
 			request.AccountNumber, request.Amount)
 
-		// Create span for business logic
-		span, ctx := apm.StartSpan(c.Request.Context(), "balance_update_business_logic", "app")
-		defer span.End()
-
 		// Update account balance
-		response, err := updateAccountBalance(ctx, db, request)
+		response, err := updateAccountBalance(c.Request.Context(), db, request)
 		if err != nil {
 			log.Printf("Failed to update balance: %v", err)
-			span.Context.SetLabel("update_result", "error")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
 				Message: "Failed to update account balance",
@@ -548,22 +451,11 @@ func updateBalanceHandler(db *sql.DB) gin.HandlerFunc {
 
 		if !response.Success {
 			log.Printf("Balance update failed: %s", response.Message)
-			span.Context.SetLabel("update_result", "business_error")
 			c.JSON(http.StatusBadRequest, ErrorResponse{
 				Error:   "balance_update_failed",
 				Message: response.Message,
 			})
 			return
-		}
-
-		span.Context.SetLabel("update_result", "success")
-		span.Context.SetLabel("old_balance", response.OldBalance)
-		span.Context.SetLabel("new_balance", response.NewBalance)
-
-		if tx != nil {
-			tx.Context.SetLabel("old_balance", response.OldBalance)
-			tx.Context.SetLabel("new_balance", response.NewBalance)
-			tx.Context.SetLabel("transaction_id", response.TransactionID)
 		}
 
 		log.Printf("Balance updated successfully for account %s: %.2f -> %.2f",
@@ -577,13 +469,9 @@ func updateBalanceHandler(db *sql.DB) gin.HandlerFunc {
 func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		span, ctx := apm.StartSpan(ctx, "create_transaction", "request")
-		defer span.End()
 
 		var req CreateTransactionRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			span.Context.SetLabel("error", "invalid_request")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusBadRequest, ErrorResponse{
 				Error:   "invalid_request",
 				Message: "Invalid request body: " + err.Error(),
@@ -602,8 +490,6 @@ func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
 		// Begin database transaction
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
-			span.Context.SetLabel("error", "db_transaction_begin_failed")
-			apm.CaptureError(ctx, err).Send()
 			log.Printf("Failed to begin transaction: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
@@ -621,14 +507,11 @@ func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
 
 		if err != nil {
 			if err == sql.ErrNoRows {
-				span.Context.SetLabel("error", "account_not_found")
 				c.JSON(http.StatusNotFound, ErrorResponse{
 					Error:   "account_not_found",
 					Message: "Account not found: " + req.AccountNumber,
 				})
 			} else {
-				span.Context.SetLabel("error", "db_account_lookup_failed")
-				apm.CaptureError(ctx, err).Send()
 				log.Printf("Failed to lookup account: %v", err)
 				c.JSON(http.StatusInternalServerError, ErrorResponse{
 					Error:   "database_error",
@@ -647,8 +530,6 @@ func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
 			accountID, req.TransactionType, req.Amount, req.Description, req.ReferenceNumber, req.BalanceAfter, req.Status).Scan(&transactionID)
 
 		if err != nil {
-			span.Context.SetLabel("error", "transaction_insert_failed")
-			apm.CaptureError(ctx, err).Send()
 			log.Printf("Failed to insert transaction: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
@@ -659,8 +540,6 @@ func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
 
 		// Commit the database transaction
 		if err = tx.Commit(); err != nil {
-			span.Context.SetLabel("error", "db_transaction_commit_failed")
-			apm.CaptureError(ctx, err).Send()
 			log.Printf("Failed to commit transaction: %v", err)
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "database_error",
@@ -677,12 +556,6 @@ func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
 			Message:       "Transaction record created successfully",
 		}
 
-		// Add success labels
-		span.Context.SetLabel("transaction_id", transactionID)
-		span.Context.SetLabel("account_number", req.AccountNumber)
-		span.Context.SetLabel("transaction_type", req.TransactionType)
-		span.Context.SetLabel("amount", req.Amount)
-
 		log.Printf("Transaction created successfully: ID=%d, Account=%s, Type=%s, Amount=%.2f",
 			transactionID, req.AccountNumber, req.TransactionType, req.Amount)
 
@@ -694,8 +567,6 @@ func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
 func healthHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		span, ctx := apm.StartSpan(ctx, "health_check", "app")
-		defer span.End()
 
 		// Check database connection
 		err := db.PingContext(ctx)
@@ -708,16 +579,11 @@ func healthHandler(db *sql.DB) gin.HandlerFunc {
 			"timestamp": time.Now().UTC(),
 		}
 
-		span.Context.SetLabel("db_healthy", dbHealthy)
-
 		if !dbHealthy {
 			health["status"] = "unhealthy"
 			health["error"] = err.Error()
-			span.Context.SetLabel("health_result", "unhealthy")
-			apm.CaptureError(ctx, err).Send()
 			c.JSON(http.StatusServiceUnavailable, health)
 		} else {
-			span.Context.SetLabel("health_result", "healthy")
 			c.JSON(http.StatusOK, health)
 		}
 	}

@@ -12,7 +12,8 @@
     "cors": "^2.8.5",
     "@faker-js/faker": "^8.0.0",
     "jsonwebtoken": "^9.0.0",
-    "bcryptjs": "^2.4.3"
+    "bcryptjs": "^2.4.3",
+    "elastic-apm-node": "^4.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1",

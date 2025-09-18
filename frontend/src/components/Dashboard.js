@@ -47,9 +47,14 @@ const Dashboard = ({ user, onLogout }) => {
             description: transaction.description,
             date: new Date(transaction.transactionDate).toLocaleDateString(),
             amount: transaction.transactionType === 'credit' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount),
-            type: transaction.transactionType,
+            type: transaction.transactionType.toLowerCase(), // Ensure lowercase for CSS classes
             reference: transaction.referenceNumber
           }));
+
+          console.log('📊 Dashboard Data Loaded:');
+          console.log('Accounts:', transformedAccounts);
+          console.log('Recent Transactions:', transformedTransactions);
+          console.log('Raw API Response:', data);
 
           setAccounts(transformedAccounts);
           setRecentTransactions(transformedTransactions);
@@ -210,18 +215,27 @@ const Dashboard = ({ user, onLogout }) => {
         <div className="dashboard-card">
           <h3 className="card-title">Recent Transactions</h3>
           <div className="transaction-list">
-            {recentTransactions.map(transaction => (
-              <div key={transaction.id} className="transaction-item">
-                <div className="transaction-details">
-                  <h4>{transaction.description}</h4>
-                  <p>{formatDate(transaction.date)}</p>
-                </div>
-                <div className={`transaction-amount ${transaction.type}`}>
-                  {transaction.type === 'credit' ? '+' : ''}
-                  {formatCurrency(Math.abs(transaction.amount))}
-                </div>
+            {recentTransactions.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                <p>No recent transactions found</p>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>
+                  Make a transfer or payment to see transactions here
+                </p>
               </div>
-            ))}
+            ) : (
+              recentTransactions.map(transaction => (
+                <div key={transaction.id} className="transaction-item">
+                  <div className="transaction-details">
+                    <h4>{transaction.description}</h4>
+                    <p>{formatDate(transaction.date)} • Ref: {transaction.reference?.substring(0, 8) || 'N/A'}</p>
+                  </div>
+                  <div className={`transaction-amount ${transaction.type}`}>
+                    {transaction.type === 'credit' ? '+' : ''}
+                    {formatCurrency(Math.abs(transaction.amount))}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

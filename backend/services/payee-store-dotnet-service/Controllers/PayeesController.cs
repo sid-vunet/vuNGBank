@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using PayeeService.Models.DTOs;
 using PayeeService.Services;
 using System.Security.Claims;
-using Elastic.Apm;
-using Elastic.Apm.Api;
 
 namespace PayeeService.Controllers
 {
@@ -33,42 +31,16 @@ namespace PayeeService.Controllers
                 var userId = GetUserId();
                 if (string.IsNullOrEmpty(userId))
                 {
-                    Agent.Tracer.CurrentTransaction?.SetLabel("error", "unauthorized");
-                    Agent.Tracer.CurrentTransaction?.SetLabel("user_id", "missing");
                     return Unauthorized("User ID not found in token");
                 }
 
-                Agent.Tracer.CurrentTransaction?.SetLabel("user_id", userId);
-                
-                // Create a span for the database operation
-                var span = Agent.Tracer.CurrentTransaction?.StartSpan("GetPayeesByUserId", "database");
-                IEnumerable<PayeeResponse> payees;
-                try
-                {
-                    payees = await _payeeService.GetPayeesByUserIdAsync(userId);
-                    span?.SetLabel("user_id", userId);
-                }
-                catch (Exception spanEx)
-                {
-                    span?.CaptureException(spanEx);
-                    throw;
-                }
-                finally
-                {
-                    span?.End();
-                }
-                
-                Agent.Tracer.CurrentTransaction?.SetLabel("payees_count", payees.Count());
-                Agent.Tracer.CurrentTransaction?.SetLabel("operation", "get_payees");
+                var payees = await _payeeService.GetPayeesByUserIdAsync(userId);
                 
                 return Ok(payees);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving payees");
-                Agent.Tracer.CurrentTransaction?.CaptureException(ex);
-                Agent.Tracer.CurrentTransaction?.SetLabel("error", "exception");
-                Agent.Tracer.CurrentTransaction?.SetLabel("error_type", ex.GetType().Name);
                 return StatusCode(500, new { message = "An error occurred while retrieving payees" });
             }
         }

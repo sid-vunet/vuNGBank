@@ -111,6 +111,53 @@ start_services() {
     print_status "Starting all services..."
     echo ""
     
+    # Check frontend preference
+    if [[ "$2" == "html-container" ]]; then
+        start_services_with_html_container
+        return
+    elif [[ "$2" == "react-container" ]]; then
+        start_services_with_react_container
+        return
+    fi
+    
+    # Default: Start with simple HTML server
+    start_services_with_html_server
+}
+
+# Start services with HTML container
+start_services_with_html_container() {
+    print_status "Starting services with HTML frontend container..."
+    
+    # Build HTML container if needed
+    print_status "Building HTML frontend container..."
+    cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
+    
+    # Start Docker services with HTML frontend profile
+    print_status "Starting Docker services with HTML frontend..."
+    docker compose --profile html-frontend up -d
+    
+    print_success "All services started with HTML frontend container!"
+    check_status
+}
+
+# Start services with React container  
+start_services_with_react_container() {
+    print_status "Starting services with React frontend container..."
+    
+    # Start Docker services with React frontend profile
+    print_status "Starting Docker services with React frontend..."
+    docker compose --profile frontend up -d
+    
+    print_success "All services started with React frontend container!"
+    check_status
+}
+
+# Start services with simple HTML server (original method)
+start_services_with_html_server() {
+# Start services with simple HTML server (original method)
+start_services_with_html_server() {
+    print_status "Starting services with simple HTML server..."
+    
     # Clean up any existing processes on port 3001 before starting
     if lsof -i :3001 >/dev/null 2>&1; then
         print_status "Cleaning up existing processes on port 3001..."
@@ -132,6 +179,7 @@ start_services() {
     
     print_success "All services started!"
     check_status
+}
 }
 
 # Stop all services
@@ -166,7 +214,7 @@ restart_services() {
     
     stop_services
     sleep 5
-    start_services
+    start_services "$1" "$2"
 }
 
 # Install dependencies
@@ -259,17 +307,27 @@ show_help() {
     print_header
     echo "VuNG Bank Service Management Script"
     echo ""
-    echo "Usage: ./manage-services.sh [command]"
+    echo "Usage: ./manage-services.sh [command] [frontend-option]"
     echo ""
     echo "Commands:"
     echo "  status    - Check status of all services"
-    echo "  start     - Start all services"
+    echo "  start     - Start all services (default: HTML server)"
     echo "  stop      - Stop all services"
     echo "  restart   - Restart all services"
     echo "  install   - Install dependencies and setup"
     echo "  logs      - Show service logs"
     echo "  health    - Run health checks"
     echo "  help      - Show this help message"
+    echo ""
+    echo "Frontend Options (for start/restart commands):"
+    echo "  html-server     - Traditional HTML server (Python, default)"
+    echo "  html-container  - HTML Multi-Page App in Docker container"
+    echo "  react-container - React SPA in Docker container"
+    echo ""
+    echo "Examples:"
+    echo "  ./manage-services.sh start                    # HTML server (default)"
+    echo "  ./manage-services.sh start html-container     # HTML in container" 
+    echo "  ./manage-services.sh start react-container    # React in container"
     echo ""
     echo "Services managed:"
     echo "  • PostgreSQL Database (port 5432)"
@@ -287,13 +345,13 @@ case "${1:-help}" in
         check_status
         ;;
     "start")
-        start_services
+        start_services "$1" "$2"
         ;;
     "stop")
         stop_services
         ;;
     "restart")
-        restart_services
+        restart_services "$1" "$2"
         ;;
     "install")
         install_dependencies

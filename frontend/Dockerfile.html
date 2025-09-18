@@ -1,0 +1,15 @@
+FROM nginx:alpine
+
+# Copy static HTML files to nginx document root
+COPY *.html /usr/share/nginx/html/
+COPY *.css /usr/share/nginx/html/
+COPY *.js /usr/share/nginx/html/
+
+# Create nginx configuration for the banking app
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,3 +1,16 @@
+// Initialize APM agent first (before any other require statements)
+const apm = require('elastic-apm-node').start({
+  serviceName: 'vubank-login-service',
+  serverUrl: 'http://91.203.133.240:30200',
+  environment: 'development',
+  active: true,
+  logLevel: 'info',
+  captureHeaders: true,
+  captureBody: 'all',
+  useHttps: false,
+  verifyServerCert: false
+});
+
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
