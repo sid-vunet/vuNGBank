@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     account_name VARCHAR(255) NOT NULL,
     account_type VARCHAR(50) NOT NULL DEFAULT 'savings',
     balance DECIMAL(15,2) DEFAULT 0.00,
-    currency VARCHAR(3) DEFAULT 'USD',
+    currency VARCHAR(3) DEFAULT 'INR',
     status VARCHAR(20) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -122,31 +122,31 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
 -- Checking: 7,50,000 to 43,00,000
 INSERT INTO accounts (user_id, account_number, account_name, account_type, balance, currency) VALUES 
     -- Original users
-    ((SELECT id FROM users WHERE username = 'johndoe'), '1001234567890', 'John Doe - Savings', 'savings', 25000.50, 'USD'),
-    ((SELECT id FROM users WHERE username = 'johndoe'), '1001234567891', 'John Doe - Checking', 'checking', 5500.75, 'USD'),
-    ((SELECT id FROM users WHERE username = 'janedoe'), '1001234567892', 'Jane Doe - Savings', 'savings', 32000.00, 'USD'),
-    ((SELECT id FROM users WHERE username = 'corpuser'), '2001234567890', 'Corporate Account', 'business', 150000.00, 'USD'),
+    ((SELECT id FROM users WHERE username = 'johndoe'), '1001234567890', 'John Doe - Savings', 'savings', 25000.50, 'INR'),
+    ((SELECT id FROM users WHERE username = 'johndoe'), '1001234567891', 'John Doe - Checking', 'checking', 5500.75, 'INR'),
+    ((SELECT id FROM users WHERE username = 'janedoe'), '1001234567892', 'Jane Doe - Savings', 'savings', 32000.00, 'INR'),
+    ((SELECT id FROM users WHERE username = 'corpuser'), '2001234567890', 'Corporate Account', 'business', 150000.00, 'INR'),
     
     -- New users with random balances
     -- Sidharth accounts
-    ((SELECT id FROM users WHERE username = 'sidharth'), '1001234567893', 'Sidharth - Savings', 'savings', 125750.00, 'USD'),
-    ((SELECT id FROM users WHERE username = 'sidharth'), '1001234567894', 'Sidharth - Checking', 'checking', 1850000.00, 'USD'),
+    ((SELECT id FROM users WHERE username = 'sidharth'), '1001234567893', 'Sidharth - Savings', 'savings', 125750.00, 'INR'),
+    ((SELECT id FROM users WHERE username = 'sidharth'), '1001234567894', 'Sidharth - Checking', 'checking', 1850000.00, 'INR'),
     
     -- Jithesh accounts
-    ((SELECT id FROM users WHERE username = 'jithesh'), '1001234567895', 'Jithesh - Savings', 'savings', 87500.00, 'USD'),
-    ((SELECT id FROM users WHERE username = 'jithesh'), '1001234567896', 'Jithesh - Checking', 'checking', 2125000.00, 'USD'),
+    ((SELECT id FROM users WHERE username = 'jithesh'), '1001234567895', 'Jithesh - Savings', 'savings', 87500.00, 'INR'),
+    ((SELECT id FROM users WHERE username = 'jithesh'), '1001234567896', 'Jithesh - Checking', 'checking', 2125000.00, 'INR'),
     
     -- Bharath accounts
-    ((SELECT id FROM users WHERE username = 'bharath'), '1001234567897', 'Bharath - Savings', 'savings', 198250.00, 'USD'),
-    ((SELECT id FROM users WHERE username = 'bharath'), '1001234567898', 'Bharath - Checking', 'checking', 3675000.00, 'USD'),
+    ((SELECT id FROM users WHERE username = 'bharath'), '1001234567897', 'Bharath - Savings', 'savings', 198250.00, 'INR'),
+    ((SELECT id FROM users WHERE username = 'bharath'), '1001234567898', 'Bharath - Checking', 'checking', 3675000.00, 'INR'),
     
     -- Ashwin accounts
-    ((SELECT id FROM users WHERE username = 'ashwin'), '1001234567899', 'Ashwin - Savings', 'savings', 156000.00, 'USD'),
-    ((SELECT id FROM users WHERE username = 'ashwin'), '1001234567810', 'Ashwin - Checking', 'checking', 2950000.00, 'USD'),
+    ((SELECT id FROM users WHERE username = 'ashwin'), '1001234567899', 'Ashwin - Savings', 'savings', 156000.00, 'INR'),
+    ((SELECT id FROM users WHERE username = 'ashwin'), '1001234567810', 'Ashwin - Checking', 'checking', 2950000.00, 'INR'),
     
     -- Rahjesh accounts
-    ((SELECT id FROM users WHERE username = 'rahjesh'), '1001234567811', 'Rahjesh - Savings', 'savings', 73200.00, 'USD'),
-    ((SELECT id FROM users WHERE username = 'rahjesh'), '1001234567812', 'Rahjesh - Checking', 'checking', 4125000.00, 'USD')
+    ((SELECT id FROM users WHERE username = 'rahjesh'), '1001234567811', 'Rahjesh - Savings', 'savings', 73200.00, 'INR'),
+    ((SELECT id FROM users WHERE username = 'rahjesh'), '1001234567812', 'Rahjesh - Checking', 'checking', 4125000.00, 'INR')
 ON CONFLICT (account_number) DO NOTHING;
 
 -- Insert sample transactions for all accounts

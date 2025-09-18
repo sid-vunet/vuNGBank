@@ -27,14 +27,14 @@ let users = [
         name: 'Current Account',
         number: '****1234',
         balance: 25430.50,
-        currency: 'USD'
+        currency: 'INR'
       },
       {
         id: 2,
         name: 'Savings Account',
         number: '****5678',
         balance: 15750.25,
-        currency: 'USD'
+        currency: 'INR'
       }
     ]
   }

@@ -1,11 +1,4 @@
-::1 - - [18/Sep/2025 09:19:49] "GET / HTTP/1.1" 304 -
-::1 - - [18/Sep/2025 09:19:51] "GET /dashboard.html HTTP/1.1" 304 -
-::1 - - [18/Sep/2025 09:19:51] code 404, message File not found
-::1 - - [18/Sep/2025 09:19:51] "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 -
-::1 - - [18/Sep/2025 09:19:51] code 404, message File not found
-::1 - - [18/Sep/2025 09:19:51] "GET /apple-touch-icon.png HTTP/1.1" 404 -
-::1 - - [18/Sep/2025 09:19:51] "GET /login.html HTTP/1.1" 304 -
-::1 - - [18/Sep/2025 09:19:51] code 404, message File not found
-::1 - - [18/Sep/2025 09:19:51] "GET /favicon.ico HTTP/1.1" 404 -
-::1 - - [18/Sep/2025 09:20:05] "GET /FundTransfer.html HTTP/1.1" 304 -
-::1 - - [18/Sep/2025 09:25:42] "GET /FundTransfer.html HTTP/1.1" 304 -
+::1 - - [18/Sep/2025 09:39:42] "GET /dashboard.html HTTP/1.1" 200 -
+::1 - - [18/Sep/2025 09:39:58] "GET /dashboard.html HTTP/1.1" 304 -
+::1 - - [18/Sep/2025 09:40:12] "GET /FundTransfer.html HTTP/1.1" 304 -
+::1 - - [18/Sep/2025 09:40:55] "GET /dashboard.html HTTP/1.1" 304 -
