@@ -4,6 +4,7 @@ import co.elastic.apm.api.ElasticApm;
 import co.elastic.apm.api.Span;
 import co.elastic.apm.api.Transaction;
 import com.vubank.core.service.PaymentProcessingService;
+import io.jsonwebtoken.Jwts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -107,7 +108,7 @@ public class CoreBankingController {
             try {
                 // Process payment synchronously (as per the 1.5s simulation requirement)
                 CompletableFuture<PaymentProcessingService.ProcessingResult> futureResult = 
-                    paymentProcessingService.processPayment(paymentRequest);
+                    paymentProcessingService.processPayment(paymentRequest, authorization);
 
                 result = futureResult.get();
                 
@@ -172,11 +173,40 @@ public class CoreBankingController {
 
     private boolean isAuthorized(String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
+            logger.debug("Authorization failed: missing or invalid Bearer token format");
             return false;
         }
         
         String token = authorization.substring("Bearer ".length());
-        return sharedSecret.equals(token);
+        logger.debug("Received token for authorization: " + token.substring(0, Math.min(20, token.length())) + "...");
+        
+        // First check if it's the shared secret
+        if (sharedSecret.equals(token)) {
+            logger.debug("Authorization successful: shared secret match");
+            return true;
+        }
+        
+        // If not shared secret, validate as JWT token
+        boolean jwtValid = isValidJwtToken(token);
+        logger.debug("JWT validation result: " + jwtValid);
+        return jwtValid;
+    }
+    
+    private boolean isValidJwtToken(String token) {
+        try {
+            logger.debug("Attempting to validate JWT token: " + token.substring(0, Math.min(50, token.length())) + "...");
+            // Use the same JWT secret as accounts service
+            String jwtSecret = "vubank-super-secret-jwt-key-2023";
+            io.jsonwebtoken.Jwts.parserBuilder()
+                .setSigningKey(jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .build()
+                .parseClaimsJws(token);
+            logger.debug("JWT token validation successful");
+            return true;
+        } catch (Exception e) {
+            logger.warn("JWT token validation failed: " + e.getMessage());
+            return false;
+        }
     }
 
     private Map<String, Object> createSuccessResponse(PaymentProcessingService.ProcessingResult result) {

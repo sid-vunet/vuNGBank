@@ -1,4 +1,5 @@
-::1 - - [18/Sep/2025 09:39:42] "GET /dashboard.html HTTP/1.1" 200 -
-::1 - - [18/Sep/2025 09:39:58] "GET /dashboard.html HTTP/1.1" 304 -
-::1 - - [18/Sep/2025 09:40:12] "GET /FundTransfer.html HTTP/1.1" 304 -
-::1 - - [18/Sep/2025 09:40:55] "GET /dashboard.html HTTP/1.1" 304 -
+::1 - - [18/Sep/2025 09:57:16] "GET /?id=84a2a0bf-0613-4f84-b745-1edc4d22652b&vscodeBrowserReqId=1758169636969 HTTP/1.1" 200 -
+::1 - - [18/Sep/2025 09:57:18] "GET /login.html HTTP/1.1" 304 -
+::1 - - [18/Sep/2025 09:57:19] "GET /dashboard.html HTTP/1.1" 304 -
+::1 - - [18/Sep/2025 09:57:19] "GET /login.html HTTP/1.1" 304 -
+::1 - - [18/Sep/2025 09:57:34] "GET /FundTransfer.html HTTP/1.1" 200 -

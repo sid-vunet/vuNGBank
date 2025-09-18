@@ -48,7 +48,8 @@ public class PaymentController {
             @RequestHeader(value = "X-Request-Id", required = false) String xRequestId,
             @RequestHeader(value = "Content-Type") String contentType,
             @RequestHeader(value = "X-Signature", required = false) String xSignature,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
 
         // Start APM Transaction
         Transaction transaction = ElasticApm.startTransaction();
@@ -164,7 +165,7 @@ public class PaymentController {
 
             // Call CoreBanking service asynchronously with APM context propagation
             CompletableFuture<CoreBankingService.CoreBankingResponse> futureResponse = 
-                coreBankingService.processPayment(txnRef, paymentRequest);
+                coreBankingService.processPayment(txnRef, paymentRequest, authorization);
 
             // Handle CoreBanking response asynchronously with APM context
             futureResponse.thenAccept(coreBankingResponse -> {

@@ -86,6 +86,23 @@ type UpdateBalanceResponse struct {
 	Message       string  `json:"message,omitempty"`
 }
 
+type CreateTransactionRequest struct {
+	AccountNumber   string  `json:"accountNumber" binding:"required"`
+	TransactionType string  `json:"transactionType" binding:"required"`
+	Amount          float64 `json:"amount" binding:"required"`
+	Description     string  `json:"description" binding:"required"`
+	ReferenceNumber string  `json:"referenceNumber" binding:"required"`
+	BalanceAfter    float64 `json:"balanceAfter" binding:"required"`
+	Status          string  `json:"status"`
+}
+
+type CreateTransactionResponse struct {
+	Success       bool   `json:"success"`
+	TransactionID int    `json:"transactionId"`
+	AccountNumber string `json:"accountNumber"`
+	Message       string `json:"message,omitempty"`
+}
+
 // JWT Claims
 type Claims struct {
 	UserID string   `json:"user_id"`
@@ -556,6 +573,123 @@ func updateBalanceHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// Create transaction handler
+func createTransactionHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+		span, ctx := apm.StartSpan(ctx, "create_transaction", "request")
+		defer span.End()
+
+		var req CreateTransactionRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			span.Context.SetLabel("error", "invalid_request")
+			apm.CaptureError(ctx, err).Send()
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "invalid_request",
+				Message: "Invalid request body: " + err.Error(),
+			})
+			return
+		}
+
+		// Set default status if not provided
+		if req.Status == "" {
+			req.Status = "completed"
+		}
+
+		log.Printf("Creating transaction for account: %s, type: %s, amount: %.2f",
+			req.AccountNumber, req.TransactionType, req.Amount)
+
+		// Begin database transaction
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			span.Context.SetLabel("error", "db_transaction_begin_failed")
+			apm.CaptureError(ctx, err).Send()
+			log.Printf("Failed to begin transaction: %v", err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "database_error",
+				Message: "Failed to begin database transaction",
+			})
+			return
+		}
+		defer tx.Rollback()
+
+		// Get account ID from account number
+		var accountID int
+		err = tx.QueryRowContext(ctx,
+			"SELECT id FROM accounts WHERE account_number = $1",
+			req.AccountNumber).Scan(&accountID)
+
+		if err != nil {
+			if err == sql.ErrNoRows {
+				span.Context.SetLabel("error", "account_not_found")
+				c.JSON(http.StatusNotFound, ErrorResponse{
+					Error:   "account_not_found",
+					Message: "Account not found: " + req.AccountNumber,
+				})
+			} else {
+				span.Context.SetLabel("error", "db_account_lookup_failed")
+				apm.CaptureError(ctx, err).Send()
+				log.Printf("Failed to lookup account: %v", err)
+				c.JSON(http.StatusInternalServerError, ErrorResponse{
+					Error:   "database_error",
+					Message: "Failed to lookup account",
+				})
+			}
+			return
+		}
+
+		// Insert transaction record
+		var transactionID int
+		err = tx.QueryRowContext(ctx, `
+			INSERT INTO transactions (account_id, transaction_type, amount, description, reference_number, balance_after, status) 
+			VALUES ($1, $2, $3, $4, $5, $6, $7) 
+			RETURNING id`,
+			accountID, req.TransactionType, req.Amount, req.Description, req.ReferenceNumber, req.BalanceAfter, req.Status).Scan(&transactionID)
+
+		if err != nil {
+			span.Context.SetLabel("error", "transaction_insert_failed")
+			apm.CaptureError(ctx, err).Send()
+			log.Printf("Failed to insert transaction: %v", err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "database_error",
+				Message: "Failed to create transaction record",
+			})
+			return
+		}
+
+		// Commit the database transaction
+		if err = tx.Commit(); err != nil {
+			span.Context.SetLabel("error", "db_transaction_commit_failed")
+			apm.CaptureError(ctx, err).Send()
+			log.Printf("Failed to commit transaction: %v", err)
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error:   "database_error",
+				Message: "Failed to commit transaction",
+			})
+			return
+		}
+
+		// Create response
+		response := CreateTransactionResponse{
+			Success:       true,
+			TransactionID: transactionID,
+			AccountNumber: req.AccountNumber,
+			Message:       "Transaction record created successfully",
+		}
+
+		// Add success labels
+		span.Context.SetLabel("transaction_id", transactionID)
+		span.Context.SetLabel("account_number", req.AccountNumber)
+		span.Context.SetLabel("transaction_type", req.TransactionType)
+		span.Context.SetLabel("amount", req.Amount)
+
+		log.Printf("Transaction created successfully: ID=%d, Account=%s, Type=%s, Amount=%.2f",
+			transactionID, req.AccountNumber, req.TransactionType, req.Amount)
+
+		c.JSON(http.StatusOK, response)
+	}
+}
+
 // Health check handler
 func healthHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -642,6 +776,7 @@ func main() {
 	{
 		internal.GET("/accounts", accountsHandler(db))
 		internal.POST("/accounts/update-balance", updateBalanceHandler(db))
+		internal.POST("/accounts/create-transaction", createTransactionHandler(db))
 	}
 
 	port := config.Port

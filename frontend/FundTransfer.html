@@ -2189,7 +2189,13 @@
             selectAccount(accountType) {
                 document.querySelectorAll('.account-option').forEach(el => el.classList.remove('selected'));
                 document.getElementById(`${accountType}Account`).classList.add('selected');
-                this.selectedAccount = accountType;
+                
+                // Find the full account object instead of just storing the type
+                const account = this.userAccounts.find(acc => acc.account_type === accountType);
+                this.selectedAccount = account;
+                this.selectedAccountType = accountType; // Keep the type for display purposes
+                
+                console.log('Selected account:', this.selectedAccount);
                 this.validateStep2();
             }
 
@@ -2215,10 +2221,9 @@
 
                 // Validate amount against account balance
                 if (amount > 0 && this.selectedAccount) {
-                    const account = this.userAccounts.find(acc => acc.account_type === this.selectedAccount);
-                    console.log('Selected account for validation:', account);
+                    console.log('Selected account for validation:', this.selectedAccount);
                     
-                    if (account && amount > parseFloat(account.balance)) {
+                    if (this.selectedAccount && amount > parseFloat(this.selectedAccount.balance)) {
                         this.continueToStep3.disabled = true;
                         console.log('Amount exceeds balance. Transfer disabled.');
                     }
@@ -2286,7 +2291,7 @@
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Transfer From:</span>
-                        <span class="detail-value">${this.selectedAccount.charAt(0).toUpperCase() + this.selectedAccount.slice(1)} Account</span>
+                        <span class="detail-value">${this.selectedAccountType.charAt(0).toUpperCase() + this.selectedAccountType.slice(1)} Account</span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">Payment Mode:</span>
@@ -2332,7 +2337,7 @@
                 const transferTransaction = elasticApm.startTransaction('fund-transfer', 'user-action');
                 transferTransaction.addLabels({
                     transfer_type: 'domestic',
-                    from_account: this.selectedAccount?.type || 'unknown',
+                    from_account: this.selectedAccount?.account_type || 'unknown',
                     payment_mode: this.selectedPaymentMode || 'unknown',
                     has_payee: !!this.selectedPayee,
                     amount: this.transferAmountInput?.value || 0
@@ -2689,13 +2694,13 @@
                 
                 try {
                     // Get the selected account details
-                    const account = this.userAccounts.find(acc => acc.account_type === this.selectedAccount);
+                    const account = this.selectedAccount;
                     const accountNumber = account ? account.accountNumber : '****0000';
                     
                     // Prepare transaction data for PDF generation
                     const transactionData = {
                         transactionId: this.transactionId,
-                        fromAccount: `${this.selectedAccount} - ****${accountNumber.slice(-4)}`,
+                        fromAccount: `${this.selectedAccountType} - ****${accountNumber.slice(-4)}`,
                         toAccount: this.selectedPayee.accountNumber,
                         payeeName: this.selectedPayee.name,
                         amount: this.transferAmount,

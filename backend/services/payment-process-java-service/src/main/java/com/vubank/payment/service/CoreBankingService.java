@@ -44,7 +44,7 @@ public class CoreBankingService {
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
-    public CompletableFuture<CoreBankingResponse> processPayment(String txnRef, PaymentRequest request) {
+    public CompletableFuture<CoreBankingResponse> processPayment(String txnRef, PaymentRequest request, String userAuthorization) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Create canonical JSON payload
@@ -56,7 +56,15 @@ public class CoreBankingService {
                 headers.set("X-Request-Id", request.getXRequestId());
                 headers.set("X-Origin-Service", "payment-process");
                 headers.set("X-Txn-Ref", txnRef);
-                headers.set("Authorization", "Bearer " + sharedSecret);
+                
+                // Use user's JWT token if provided, otherwise fallback to shared secret
+                if (userAuthorization != null && !userAuthorization.trim().isEmpty()) {
+                    headers.set("Authorization", userAuthorization);
+                    logger.debug("Using user JWT token for CoreBanking authentication");
+                } else {
+                    headers.set("Authorization", "Bearer " + sharedSecret);
+                    logger.debug("Using shared secret for CoreBanking authentication");
+                }
 
                 HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(payload, headers);
 

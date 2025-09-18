@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS core_payments (
     id SERIAL PRIMARY KEY,
     cbs_id UUID NOT NULL UNIQUE,
     txn_ref UUID NOT NULL UNIQUE,
-    status VARCHAR(20) NOT NULL,
+    status VARCHAR(50) NOT NULL,
     amount NUMERIC(15,2) NOT NULL,
     payer_account VARCHAR(50) NOT NULL,
     payee_account VARCHAR(50) NOT NULL,
