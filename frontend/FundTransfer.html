@@ -2083,7 +2083,7 @@
                     from_account: this.selectedAccount?.type || 'unknown',
                     payment_mode: this.selectedPaymentMode || 'unknown',
                     has_payee: !!this.selectedPayee,
-                    amount: this.amountInput?.value || 0
+                    amount: this.transferAmountInput?.value || 0
                 });
                 
                 const pin = this.pinInputs.map(input => input.value).join('');
@@ -2111,34 +2111,41 @@
                     // Start span for transfer processing
                     const processSpan = transferTransaction.startSpan('transfer-processing', 'business-logic');
                     
-                    // Simulate API call
-                    await this.simulateTransferProcess();
+                    // Create PACS XML and initiate real transfer
+                    const transferResult = await this.initiateRealTransfer();
                     processSpan.end();
                     
-                    // Generate transaction ID
-                    this.transactionId = 'TXN' + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase();
-                    this.transactionIdSpan.textContent = this.transactionId;
-                    
-                    // Update final transaction details
-                    this.updateFinalTransactionDetails();
-                    
-                    // Add success labels to transaction
-                    transferTransaction.addLabels({
-                        transfer_result: 'success',
-                        transaction_id: this.transactionId,
-                        processing_time: '3000ms'
-                    });
-                    
-                    // Track successful transfer
-                    elasticApm.addLabels({
-                        last_transfer: new Date().toISOString(),
-                        transfer_count: parseInt(localStorage.getItem('transfer_count') || '0') + 1
-                    });
-                    localStorage.setItem('transfer_count', (parseInt(localStorage.getItem('transfer_count') || '0') + 1).toString());
-                    
-                    // Hide loading and go to success step
-                    this.loadingOverlay.classList.remove('show');
-                    this.goToStep(5);
+                    if (transferResult.success) {
+                        // Store transaction reference
+                        this.transactionId = transferResult.txnRef;
+                        this.transactionIdSpan.textContent = this.transactionId;
+                        
+                        // Start polling for status updates
+                        await this.pollTransactionStatus(transferResult.txnRef);
+                        
+                        // Add success labels to transaction
+                        transferTransaction.addLabels({
+                            transfer_result: 'success',
+                            transaction_id: this.transactionId,
+                            txn_ref: transferResult.txnRef
+                        });
+                        
+                        // Track successful transfer
+                        elasticApm.addLabels({
+                            last_transfer: new Date().toISOString(),
+                            transfer_count: parseInt(localStorage.getItem('transfer_count') || '0') + 1
+                        });
+                        localStorage.setItem('transfer_count', (parseInt(localStorage.getItem('transfer_count') || '0') + 1).toString());
+                        
+                        // Update final transaction details
+                        this.updateFinalTransactionDetails();
+                        
+                        // Hide loading and go to success step
+                        this.loadingOverlay.classList.remove('show');
+                        this.goToStep(5);
+                    } else {
+                        throw new Error(transferResult.message || 'Transfer initiation failed');
+                    }
                     
                 } catch (error) {
                     // Capture transfer errors
@@ -2150,15 +2157,241 @@
                     });
                     
                     this.loadingOverlay.classList.remove('show');
-                    alert('Transfer failed. Please try again.');
+                    alert('Transfer failed: ' + error.message);
                 } finally {
                     transferTransaction.end();
                 }
             }
 
+            async initiateRealTransfer() {
+                try {
+                    // Create PACS XML payload
+                    const pacsXml = this.createPacsXml();
+                    
+                    // Get authentication token
+                    const token = localStorage.getItem('vubank_token');
+                    if (!token) {
+                        throw new Error('Authentication token not found');
+                    }
+
+                    // Generate request ID for tracing
+                    const xRequestId = this.generateUUID();
+                    
+                    // Call payment-process-java-service
+                    const response = await fetch('http://localhost:8004/payments/transfer', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/xml',
+                            'X-Api-Client': 'web-portal',
+                            'X-Request-Id': xRequestId,
+                            'X-Signature': 'demo-signature-' + Date.now(), // Placeholder signature
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: pacsXml
+                    });
+
+                    const responseData = await response.json();
+
+                    if (response.status === 202) {
+                        return {
+                            success: true,
+                            txnRef: responseData.txnRef,
+                            status: responseData.status
+                        };
+                    } else if (response.status === 402) {
+                        return {
+                            success: false,
+                            message: 'Insufficient balance in your account'
+                        };
+                    } else {
+                        return {
+                            success: false,
+                            message: responseData.reason || 'Transfer initiation failed'
+                        };
+                    }
+                } catch (error) {
+                    console.error('Transfer initiation error:', error);
+                    return {
+                        success: false,
+                        message: error.message || 'Network error occurred'
+                    };
+                }
+            }
+
+            createPacsXml() {
+                const now = new Date().toISOString();
+                const userData = JSON.parse(localStorage.getItem('vubank_user') || '{}');
+                
+                return `<?xml version="1.0" encoding="UTF-8"?>
+<PaymentInstruction>
+    <PayeeName>${this.selectedPayee.name}</PayeeName>
+    <IFSCCode>${this.selectedPayee.ifscCode}</IFSCCode>
+    <PaymentType>${this.selectedPaymentMode}</PaymentType>
+    <DateTime>${now}</DateTime>
+    <CustomerName>${userData.username || 'Unknown'}</CustomerName>
+    <FromAccountNo>${this.selectedAccount.number}</FromAccountNo>
+    <ToAccountNo>${this.selectedPayee.accountNumber}</ToAccountNo>
+    <BranchName>${this.selectedPayee.bankName || 'Unknown Branch'}</BranchName>
+    <Amount>${this.transferAmountInput.value}</Amount>
+    <Comments>${this.transferNoteInput.value || ''}</Comments>
+</PaymentInstruction>`;
+            }
+
+            async pollTransactionStatus(txnRef) {
+                const maxPolls = 30; // Maximum 30 seconds of polling
+                let pollCount = 0;
+                
+                // Show dynamic status
+                this.showTransactionStatus('Initiated', 'Transaction has been initiated...', 'initiated');
+                
+                return new Promise((resolve) => {
+                    const pollInterval = setInterval(async () => {
+                        try {
+                            pollCount++;
+                            
+                            // Random wait time around 1.3 seconds (1.0 to 1.6 seconds)
+                            const randomWait = 1000 + Math.random() * 600;
+                            await new Promise(resolve => setTimeout(resolve, randomWait));
+                            
+                            const response = await fetch(`http://localhost:8004/payments/status/${txnRef}`);
+                            const statusData = await response.json();
+                            
+                            if (response.ok) {
+                                const status = statusData.status;
+                                
+                                switch (status) {
+                                    case 'IN_PROGRESS':
+                                        this.showTransactionStatus('Processing', 'Payment is being processed by core banking...', 'processing');
+                                        break;
+                                    case 'SUCCESS':
+                                        this.showTransactionStatus('Completed', 'Payment completed successfully!', 'success');
+                                        clearInterval(pollInterval);
+                                        resolve({ success: true, cbsId: statusData.cbsId });
+                                        break;
+                                    case 'FAILED':
+                                        this.showTransactionStatus('Failed', `Payment failed: ${statusData.reason}`, 'failed');
+                                        clearInterval(pollInterval);
+                                        resolve({ success: false, reason: statusData.reason });
+                                        break;
+                                    default:
+                                        this.showTransactionStatus('Processing', `Status: ${status}`, 'processing');
+                                }
+                            }
+                            
+                            // Stop polling after max attempts
+                            if (pollCount >= maxPolls) {
+                                clearInterval(pollInterval);
+                                this.showTransactionStatus('Timeout', 'Status check timed out. Please check transaction history.', 'timeout');
+                                resolve({ success: false, reason: 'Status polling timeout' });
+                            }
+                            
+                        } catch (error) {
+                            console.error('Status polling error:', error);
+                            clearInterval(pollInterval);
+                            this.showTransactionStatus('Error', 'Unable to check transaction status', 'error');
+                            resolve({ success: false, reason: 'Status polling error' });
+                        }
+                    }, 100); // Quick interval, but actual delay is controlled by randomWait
+                });
+            }
+
+            showTransactionStatus(status, message, statusType) {
+                // Update the loading overlay to show status with refresh icon and dynamic colors
+                const loadingContent = this.loadingOverlay.querySelector('.loading-content');
+                if (loadingContent) {
+                    const statusConfig = {
+                        'initiated': { color: '#007bff', bgColor: '#e3f2fd' },
+                        'processing': { color: '#ff9800', bgColor: '#fff3e0' },
+                        'success': { color: '#4caf50', bgColor: '#e8f5e9' },
+                        'failed': { color: '#f44336', bgColor: '#ffebee' },
+                        'timeout': { color: '#9e9e9e', bgColor: '#f5f5f5' },
+                        'error': { color: '#f44336', bgColor: '#ffebee' }
+                    };
+                    
+                    const config = statusConfig[statusType] || statusConfig['processing'];
+                    
+                    // Create rotating refresh icon
+                    const refreshIcon = statusType !== 'success' && statusType !== 'failed' && statusType !== 'error' && statusType !== 'timeout';
+                    
+                    loadingContent.innerHTML = `
+                        <div class="status-container" style="
+                            background: ${config.bgColor};
+                            border: 2px solid ${config.color};
+                            border-radius: 12px;
+                            padding: 30px;
+                            text-align: center;
+                            max-width: 400px;
+                            margin: 0 auto;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                        ">
+                            <div class="refresh-icon" style="
+                                font-size: 3em;
+                                color: ${config.color};
+                                margin-bottom: 20px;
+                                ${refreshIcon ? 'animation: spin 1.5s linear infinite;' : ''}
+                            ">
+                                ${refreshIcon ? '🔄' : (statusType === 'success' ? '✅' : statusType === 'failed' ? '❌' : statusType === 'error' ? '⚠️' : '⏰')}
+                            </div>
+                            <div class="status-title" style="
+                                font-size: 1.5em;
+                                font-weight: bold;
+                                color: ${config.color};
+                                margin-bottom: 15px;
+                                text-transform: uppercase;
+                                letter-spacing: 1px;
+                            ">${status}</div>
+                            <div class="status-message" style="
+                                font-size: 1.1em;
+                                color: #333;
+                                line-height: 1.4;
+                                margin-bottom: 20px;
+                            ">${message}</div>
+                            <div class="status-indicator-bar" style="
+                                width: 100%;
+                                height: 4px;
+                                background: #e0e0e0;
+                                border-radius: 2px;
+                                overflow: hidden;
+                            ">
+                                <div class="status-progress" style="
+                                    height: 100%;
+                                    background: ${config.color};
+                                    width: ${statusType === 'success' ? '100%' : statusType === 'failed' || statusType === 'error' ? '100%' : '60%'};
+                                    transition: width 0.3s ease;
+                                    ${refreshIcon ? 'animation: progress 2s ease-in-out infinite;' : ''}
+                                "></div>
+                            </div>
+                        </div>
+                        
+                        <style>
+                        @keyframes spin {
+                            from { transform: rotate(0deg); }
+                            to { transform: rotate(360deg); }
+                        }
+                        @keyframes progress {
+                            0%, 100% { width: 30%; }
+                            50% { width: 80%; }
+                        }
+                        </style>
+                    `;
+                    
+                    // Update page background color based on status
+                    document.body.style.backgroundColor = config.bgColor;
+                    document.body.style.transition = 'background-color 0.5s ease';
+                }
+            }
+
+            generateUUID() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    const r = Math.random() * 16 | 0;
+                    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
             async simulateTransferProcess() {
-                // Simulate processing time
-                return new Promise(resolve => setTimeout(resolve, 3000));
+                // Legacy method - no longer used with real transfer system
+                return Promise.resolve();
             }
 
             updateFinalTransactionDetails() {
