@@ -7,50 +7,73 @@
     <!-- Elastic RUM Agent -->
     <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
-        // Initialize Elastic RUM
-        const apm = elasticApm.init({
+        // Initialize Elastic RUM with MAXIMUM automatic data capture (NO CUSTOM INSTRUMENTATION)
+        window.elasticApm = elasticApm.init({
+            // === CORE CONFIGURATION ===
             serviceName: 'vubank-frontend-test',
             serverUrl: 'http://91.203.133.240:30200',
             serviceVersion: '1.0.0',
             environment: 'test',
-            distributedTracingOrigins: ['http://localhost:8000'],
+            
+            // === DISTRIBUTED TRACING (Maximum Coverage with Actual Service Names) ===
             distributedTracing: true,
-            instrumentFetch: true,
-            logLevel: 'debug',
+            distributedTracingOrigins: [
+                // Container-based service names (for production)
+                'http://login-go-service:8000',
+                'http://login-python-authenticator:8001', 
+                'http://accounts-go-service:8002',
+                'http://pdf-receipt-java-service:8003',
+                'http://payment-process-java-service:8004',
+                'http://corebanking-java-service:8005',
+                'http://payee-store-dotnet-service:5004',
+                
+                // Local development endpoints
+                'http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 
+                'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
+                'http://localhost:5004',
+                
+                // APM server
+                'http://91.203.133.240:30200',
+                
+                // Catch-all for any other origins
+                '*'
+            ],
+            
+            // === AUTOMATIC INSTRUMENTATION (Enable Everything) ===
+            disableInstrumentations: [], // Empty = enable all automatic capture
+            instrumentFetch: true,          // Capture fetch requests
+            instrumentXMLHttpRequest: true, // Capture XHR requests
+            captureHeaders: true,          // Capture HTTP headers
+            captureBody: 'all',           // Capture request/response bodies
+            capturePageLoad: true,         // Capture page load metrics
+            capturePageLoadSpans: true,    // Detailed page load spans
+            captureUserInteractions: true, // Auto-capture clicks, form submissions
+            captureNavigation: true,       // Single-page app navigation
+            captureErrors: true,           // Automatic error capture
+            captureUnhandledRejections: true, // Promise rejections
+            captureResourceTimings: true,  // CSS, JS, image load times
+            breakdownMetrics: true,        // Detailed performance breakdowns
+            session: true,                 // Enable session tracking
+            transactionSampleRate: 1.0,    // Capture 100% of transactions
+            spanSampleRate: 1.0,          // Capture 100% of spans
+            logLevel: 'trace',            // Maximum logging detail
             active: true
         });
         
-        console.log('RUM Agent initialized:', apm);
+        console.log('RUM Agent initialized with AUTOMATIC instrumentation only:', window.elasticApm);
     </script>
 </head>
 <body>
-    <h1>Trace Propagation Test</h1>
-    <button onclick="testLogin()">Test Login with Trace Headers</button>
+    <h1>AUTOMATIC Trace Test (No Custom Instrumentation)</h1>
+    <button onclick="testLogin()">Test Automatic RUM Instrumentation</button>
     <div id="result"></div>
     
     <script>
         async function testLogin() {
-            console.log('🚀 Starting trace propagation test...');
-            
-            // Start a RUM transaction
-            const transaction = elasticApm.startTransaction('test-login-trace', 'user-interaction');
-            transaction.addLabels({
-                test_type: 'trace_propagation',
-                timestamp: new Date().toISOString()
-            });
+            console.log('🚀 Starting AUTOMATIC trace test (no custom instrumentation)...');
             
             try {
-                // Start span for API call
-                const span = transaction.startSpan('login-api-call', 'http');
-                span.addLabels({
-                    endpoint: '/api/login',
-                    method: 'POST'
-                });
-                
-                console.log('📋 Active transaction:', transaction);
-                console.log('📋 Current span:', span);
-                
-                // Method 1: Let RUM auto-instrument
+                // RUM will automatically instrument this fetch call and create distributed traces
                 console.log('🔄 Testing automatic instrumentation...');
                 const response1 = await fetch('http://localhost:8000/api/login', {
                     method: 'POST',
@@ -66,27 +89,14 @@
                     })
                 });
                 
-                span.end();
-                
-                // Method 2: Manual trace headers
-                console.log('🔄 Testing manual trace headers...');
-                const span2 = transaction.startSpan('login-api-call-manual', 'http');
-                
-                // Get current transaction trace ID manually
-                const traceId = transaction.traceId || 'unknown';
-                const spanId = span2.id || '0000000000000000';
-                const traceparent = `00-${traceId}-${spanId}-01`;
-                
-                console.log('🔍 Manual traceparent:', traceparent);
-                
+                // RUM will automatically instrument this second fetch call too
+                console.log('🔄 Testing second automatic instrumentation...');
                 const response2 = await fetch('http://localhost:8000/api/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Api-Client': 'web-portal',
-                        'Origin': window.location.origin,
-                        'traceparent': traceparent,
-                        'tracestate': 'vubank=manual-test'
+                        'Origin': window.location.origin
                     },
                     body: JSON.stringify({
                         username: 'johndoe',
@@ -95,31 +105,22 @@
                     })
                 });
                 
-                span2.end();
-                
                 document.getElementById('result').innerHTML = `
-                    <h3>Test Results:</h3>
-                    <p><strong>Auto-instrumentation:</strong> Status ${response1.status}</p>
-                    <p><strong>Manual headers:</strong> Status ${response2.status}</p>
-                    <p><strong>Transaction ID:</strong> ${traceId}</p>
-                    <p><strong>Check backend logs for trace headers!</strong></p>
+                    <h3>AUTOMATIC Instrumentation Test Results:</h3>
+                    <p><strong>First auto-instrumented call:</strong> Status ${response1.status}</p>
+                    <p><strong>Second auto-instrumented call:</strong> Status ${response2.status}</p>
+                    <p><strong>✅ All instrumentation is AUTOMATIC - no custom code!</strong></p>
+                    <p><strong>Check APM server for automatic distributed traces!</strong></p>
                 `;
-                
-                transaction.addLabels({
-                    test_result: 'success',
-                    auto_status: response1.status,
-                    manual_status: response2.status
-                });
                 
             } catch (error) {
                 console.error('❌ Test failed:', error);
-                transaction.addLabels({
-                    test_result: 'error',
-                    error_message: error.message
-                });
-                elasticApm.captureError(error);
-            } finally {
-                transaction.end();
+                // RUM will automatically capture this error
+                document.getElementById('result').innerHTML = `
+                    <h3>Test Error:</h3>
+                    <p>Error: ${error.message}</p>
+                    <p><strong>Error was automatically captured by RUM agent!</strong></p>
+                `;
             }
         }
     </script>

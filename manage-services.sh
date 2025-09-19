@@ -154,8 +154,6 @@ start_services_with_react_container() {
 
 # Start services with simple HTML server (original method)
 start_services_with_html_server() {
-# Start services with simple HTML server (original method)
-start_services_with_html_server() {
     print_status "Starting services with simple HTML server..."
     
     # Clean up any existing processes on port 3001 before starting
@@ -179,7 +177,6 @@ start_services_with_html_server() {
     
     print_success "All services started!"
     check_status
-}
 }
 
 # Stop all services

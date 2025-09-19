@@ -13,25 +13,146 @@
     <!-- Elastic RUM Agent -->
     <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
-        // Initialize Elastic RUM
-        elasticApm.init({
+        // Initialize Elastic RUM with MAXIMUM automatic data capture
+        window.elasticApm = elasticApm.init({
+            // === CORE CONFIGURATION ===
             serviceName: 'vubank-frontend',
             serverUrl: 'http://91.203.133.240:30200',
             serviceVersion: '1.0.0',
             environment: 'production',
-            // Page-specific configuration
-            pageLoadTransactionName: 'dashboard-page-load',
-            // Additional configuration
+            
+            // === DISTRIBUTED TRACING (Maximum Coverage with Actual Service Names) ===
+            distributedTracing: true,
             distributedTracingOrigins: [
-                'vubank-login-service',
-                'http://localhost:8000',
-                'http://localhost:8001',
-                'http://localhost:8002',
-                'http://localhost:8003',
-                'http://localhost:5004'
+                // Container-based service names (for production)
+                'http://login-go-service:8000',
+                'http://login-python-authenticator:8001', 
+                'http://accounts-go-service:8002',
+                'http://pdf-receipt-java-service:8003',
+                'http://payment-process-java-service:8004',
+                'http://corebanking-java-service:8005',
+                'http://payee-store-dotnet-service:5004',
+                
+                // Local development endpoints
+                'http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 
+                'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
+                'http://localhost:5004',
+                
+                // APM server
+                'http://91.203.133.240:30200',
+                
+                // Docker compose service names (internal network)
+                'http://vubank-frontend:3000',
+                'http://vubank-html-frontend:80',
+                
+                // Catch-all for any other origins
+                '*'
             ],
-            disableInstrumentations: [],
-            logLevel: 'info'
+            
+            // === AUTOMATIC INSTRUMENTATION (Enable Everything) ===
+            disableInstrumentations: [], // Empty = enable all automatic capture
+            
+            // === HTTP INSTRUMENTATION ===
+            instrumentFetch: true,          // Capture fetch requests
+            instrumentXMLHttpRequest: true, // Capture XHR requests
+            captureHeaders: true,          // Capture HTTP headers
+            captureBody: 'all',           // Capture request/response bodies
+            
+            // === PAGE LOAD INSTRUMENTATION ===
+            capturePageLoad: true,         // Capture page load metrics
+            capturePageLoadSpans: true,    // Detailed page load spans
+            pageLoadTransactionName: 'dashboard-page-load',
+            pageLoadSpanId: true,         // Include span IDs
+            
+            // === USER INTERACTION INSTRUMENTATION ===
+            captureUserInteractions: true, // Auto-capture clicks, form submissions
+            userInteractionTimeout: 5000,  // Keep interactions active for 5s
+            
+            // === NAVIGATION INSTRUMENTATION ===
+            captureNavigation: true,       // Single-page app navigation
+            
+            // === ERROR INSTRUMENTATION ===
+            captureErrors: true,           // Automatic error capture
+            errorThrottleLimit: 200,       // Allow many error reports
+            errorThrottleInterval: 30000,  // Reset error throttle every 30s
+            captureUnhandledRejections: true, // Promise rejections
+            
+            // === PERFORMANCE MONITORING ===
+            // Transaction sampling
+            transactionSampleRate: 1.0,    // Capture 100% of transactions
+            
+            // Span sampling  
+            spanSampleRate: 1.0,          // Capture 100% of spans
+            
+            // Transaction timeout
+            transactionTimeout: 30000,     // 30 second timeout for long operations
+            
+            // === RESOURCE MONITORING ===
+            captureResourceTimings: true,  // CSS, JS, image load times
+            
+            // === BREAKDOWN METRICS ===
+            breakdownMetrics: true,        // Detailed performance breakdowns
+            
+            // === SESSION TRACKING ===
+            session: true,                 // Enable session tracking
+            sessionTimeout: 30 * 60 * 1000, // 30 minute sessions
+            
+            // === SPAN CONFIGURATION ===
+            spanStackTraceMinDuration: 0,  // Capture stack traces for all spans
+            spanCompressionEnabled: false, // Disable compression for full detail
+            
+            // === LOGGING ===
+            logLevel: 'trace',            // Maximum logging detail
+            sendCredentials: false,        // Security consideration
+            
+            // === METADATA CAPTURE ===
+            captureSpanStackTraces: true, // Stack traces in spans
+            sourcemapsEnabled: true,      // Source map support
+            
+            // === CONTEXT PROPAGATION ===
+            propagateTracestate: true,    // W3C trace context
+            
+            // === CUSTOM CONTEXT (Automatic) ===
+            context: {
+                user: {
+                    id: 'auto-detected',
+                    username: 'auto-detected', 
+                    email: 'auto-detected'
+                },
+                custom: {
+                    application: 'vubank-frontend',
+                    version: '1.0.0',
+                    page: 'dashboard-page'
+                }
+            },
+            
+            // === LONG TASK MONITORING ===
+            longTask: {
+                threshold: 50 // Capture tasks longer than 50ms
+            },
+            
+            // === CENTRAL CONFIGURATION ===
+            centralConfig: true,          // Allow server-side config updates
+            
+            // === ADVANCED PERFORMANCE ===
+            memoryLimit: 10 * 1024 * 1024, // 10MB memory limit
+            queueLimit: 1000,             // Large event queue
+            flushInterval: 500,           // Flush every 500ms
+            
+            // === EXPERIMENTAL FEATURES ===
+            experimental: {
+                asyncStack: true,         // Async stack traces
+            },
+            
+            // === API REQUEST DETAILS ===
+            apiRequestTime: true,         // Capture API timings
+            apiRequestSize: true,         // Capture request sizes
+            
+            // === BROWSER METRICS ===
+            browserHistory: true,         // Browser history changes
+            
+            // Enable active monitoring
+            active: true
         });
         
         // Enhanced authentication validation function
