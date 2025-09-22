@@ -86,14 +86,33 @@ check_status() {
     else
         print_error "❌ Java CoreBanking Service (8005) - Not Running"
     fi
+
+    if docker compose ps | grep -q "payment-process-java-service.*Up"; then
+        print_success "✅ Java Payment Service (8004) - Running"
+    else
+        print_error "❌ Java Payment Service (8004) - Not Running"
+    fi
     
     if docker compose ps | grep -q "vubank-postgres.*Up"; then
         print_success "✅ PostgreSQL Database (5432) - Running"
     else
         print_error "❌ PostgreSQL Database (5432) - Not Running"
     fi
+
+    # Check Frontend services (Docker containers)
+    if docker compose ps | grep -q "vubank-frontend.*Up"; then
+        print_success "✅ React Frontend (3000) - Running"
+    else
+        print_error "❌ React Frontend (3000) - Not Running"
+    fi
     
-    # Check Frontend (HTML Server)
+    if docker compose ps | grep -q "vubank-html-frontend.*Up"; then
+        print_success "✅ HTML Frontend (3001) - Running"
+    else
+        print_error "❌ HTML Frontend (3001) - Not Running"
+    fi
+
+    # Check Frontend (HTML Server) - legacy local server
     if lsof -i :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         print_success "✅ HTML Frontend Server (3001) - Running"
     else
@@ -102,13 +121,15 @@ check_status() {
     
     echo ""
     echo "🔗 Service URLs:"
-    echo "   Frontend:     http://localhost:3001"
-    echo "   Login API:    http://localhost:8000"
-    echo "   Auth Service: http://localhost:8001"
-    echo "   Accounts API: http://localhost:8002"
-    echo "   PDF Service:  http://localhost:8003"
-    echo "   CoreBanking:  http://localhost:8005"
-    echo "   Database:     localhost:5432"
+    echo "   React Frontend:   http://localhost:3000 (with health: /health)"
+    echo "   HTML Frontend:    http://localhost:3001 (with health: /health)"
+    echo "   Login API:        http://localhost:8000"
+    echo "   Auth Service:     http://localhost:8001"
+    echo "   Accounts API:     http://localhost:8002"
+    echo "   PDF Service:      http://localhost:8003"
+    echo "   Payment Service:  http://localhost:8004 (with health: /payments/health)"
+    echo "   CoreBanking:      http://localhost:8005"
+    echo "   Database:         localhost:5432"
     echo ""
 }
 
@@ -301,7 +322,26 @@ health_check() {
     else
         print_error "❌ CoreBanking Service health check failed"
     fi
+
+    if curl -s "http://localhost:8004/payments/health" >/dev/null 2>&1; then
+        print_success "✅ Payment Service health check passed"
+    else
+        print_error "❌ Payment Service health check failed"
+    fi
+
+    # Frontend health checks
+    if curl -s "http://localhost:3000/health" >/dev/null 2>&1; then
+        print_success "✅ React Frontend health check passed"
+    else
+        print_error "❌ React Frontend health check failed (not running)"
+    fi
     
+    if curl -s "http://localhost:3001/health" >/dev/null 2>&1; then
+        print_success "✅ HTML Frontend health check passed"
+    else
+        print_error "❌ HTML Frontend health check failed (not running)"
+    fi
+
     if curl -s "http://localhost:3001" >/dev/null 2>&1; then
         print_success "✅ Frontend Server health check passed"
     else

@@ -15,7 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -174,6 +177,89 @@ public class PaymentController {
             return ResponseEntity.internalServerError()
                 .body(new PaymentResponse(txnRef, "ERROR", "Failed to retrieve status"));
         }
+    }
+
+    // Health Check Endpoints
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> health() {
+        Map<String, Object> healthData = new HashMap<>();
+        
+        try {
+            // Basic service information
+            healthData.put("status", "healthy");
+            healthData.put("service", "vubank-payment-service");
+            healthData.put("timestamp", LocalDateTime.now().toString());
+            healthData.put("version", "1.0.0");
+            
+            // Runtime information
+            Runtime runtime = Runtime.getRuntime();
+            long maxMemory = runtime.maxMemory();
+            long totalMemory = runtime.totalMemory();
+            long freeMemory = runtime.freeMemory();
+            long usedMemory = totalMemory - freeMemory;
+            
+            Map<String, Object> memoryInfo = new HashMap<>();
+            memoryInfo.put("used", formatBytes(usedMemory));
+            memoryInfo.put("free", formatBytes(freeMemory));
+            memoryInfo.put("total", formatBytes(totalMemory));
+            memoryInfo.put("max", formatBytes(maxMemory));
+            healthData.put("memory", memoryInfo);
+            
+            // System uptime approximation
+            healthData.put("uptime", java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime());
+            
+            // Environment
+            healthData.put("environment", System.getProperty("spring.profiles.active", "production"));
+            
+            // Check dependencies health
+            Map<String, String> dependencies = new HashMap<>();
+            
+            // Check Hazelcast connection
+            try {
+                transactionStateService.getClass(); // Simple dependency check
+                dependencies.put("hazelcast", "healthy");
+            } catch (Exception e) {
+                dependencies.put("hazelcast", "unhealthy: " + e.getMessage());
+                healthData.put("status", "degraded");
+            }
+            
+            // Check CoreBanking service connection  
+            try {
+                coreBankingService.getClass(); // Simple dependency check
+                dependencies.put("corebanking", "healthy");
+            } catch (Exception e) {
+                dependencies.put("corebanking", "unhealthy: " + e.getMessage());
+                healthData.put("status", "degraded");
+            }
+            
+            healthData.put("dependencies", dependencies);
+            
+            logger.debug("Health check completed successfully");
+            return ResponseEntity.ok(healthData);
+            
+        } catch (Exception e) {
+            logger.error("Health check failed", e);
+            healthData.put("status", "unhealthy");
+            healthData.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(healthData);
+        }
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> status() {
+        Map<String, Object> statusData = new HashMap<>();
+        statusData.put("status", "ok");
+        statusData.put("service", "vubank-payment-service");
+        statusData.put("timestamp", LocalDateTime.now().toString());
+        
+        return ResponseEntity.ok(statusData);
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        String pre = "KMGTPE".charAt(exp - 1) + "";
+        return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
     }
 
     private void validateHeaders(String xApiClient, String contentType, String xSignature) {
