@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
@@ -99,6 +100,16 @@ public class CoreBankingController {
         response.put("message", "Status lookup by cbsId not implemented yet");
         
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("CoreBanking Service is running");
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<String> status() {
+        return ResponseEntity.ok("CoreBanking Service Status: OK");
     }
 
     private boolean isAuthorized(String authorization) {

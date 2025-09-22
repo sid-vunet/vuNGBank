@@ -81,6 +81,12 @@ check_status() {
         print_error "❌ Java PDF Receipt Service (8003) - Not Running"
     fi
     
+    if docker compose ps | grep -q "corebanking-java-service.*Up"; then
+        print_success "✅ Java CoreBanking Service (8005) - Running"
+    else
+        print_error "❌ Java CoreBanking Service (8005) - Not Running"
+    fi
+    
     if docker compose ps | grep -q "vubank-postgres.*Up"; then
         print_success "✅ PostgreSQL Database (5432) - Running"
     else
@@ -101,6 +107,7 @@ check_status() {
     echo "   Auth Service: http://localhost:8001"
     echo "   Accounts API: http://localhost:8002"
     echo "   PDF Service:  http://localhost:8003"
+    echo "   CoreBanking:  http://localhost:8005"
     echo "   Database:     localhost:5432"
     echo ""
 }
@@ -289,6 +296,12 @@ health_check() {
         print_error "❌ PDF Receipt Service health check failed"
     fi
     
+    if curl -s "http://localhost:8005/core/health" >/dev/null 2>&1; then
+        print_success "✅ CoreBanking Service health check passed"
+    else
+        print_error "❌ CoreBanking Service health check failed"
+    fi
+    
     if curl -s "http://localhost:3001" >/dev/null 2>&1; then
         print_success "✅ Frontend Server health check passed"
     else
@@ -332,6 +345,7 @@ show_help() {
     echo "  • Python Auth Service (port 8001)"
     echo "  • Go Accounts Service (port 8002)"
     echo "  • Java PDF Receipt Service (port 8003)"
+    echo "  • Java CoreBanking Service (port 8005)"
     echo "  • HTML Frontend Server (port 3001)"
     echo ""
 }
