@@ -300,7 +300,7 @@ health_check() {
     print_status "Checking service endpoints..."
     
     # Test endpoints
-    if curl -s "http://localhost:8000/health" >/dev/null 2>&1; then
+    if curl -s "http://localhost:8000/api/health" >/dev/null 2>&1; then
         print_success "✅ Login Gateway health check passed"
     else
         print_error "❌ Login Gateway health check failed"

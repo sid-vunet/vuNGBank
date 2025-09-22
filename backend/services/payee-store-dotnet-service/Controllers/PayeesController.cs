@@ -226,22 +226,6 @@ namespace PayeeService.Controllers
             }
         }
 
-        /// <summary>
-        /// Simple status endpoint
-        /// </summary>
-        [HttpGet("status")]
-        public IActionResult GetStatus()
-        {
-            var statusData = new
-            {
-                status = "ok",
-                service = "vubank-payee-service",
-                timestamp = DateTime.UtcNow.ToString("O")
-            };
-
-            return Ok(statusData);
-        }
-
         private static string GetUptime()
         {
             var uptime = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
