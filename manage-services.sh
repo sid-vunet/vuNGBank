@@ -92,6 +92,12 @@ check_status() {
     else
         print_error "❌ Java Payment Service (8004) - Not Running"
     fi
+
+    if docker compose ps | grep -q "payee-store-dotnet-service.*Up"; then
+        print_success "✅ .NET Payee Service (5004) - Running"
+    else
+        print_error "❌ .NET Payee Service (5004) - Not Running"
+    fi
     
     if docker compose ps | grep -q "vubank-postgres.*Up"; then
         print_success "✅ PostgreSQL Database (5432) - Running"
@@ -128,6 +134,7 @@ check_status() {
     echo "   Accounts API:     http://localhost:8002"
     echo "   PDF Service:      http://localhost:8003"
     echo "   Payment Service:  http://localhost:8004 (with health: /payments/health)"
+    echo "   Payee Service:    http://localhost:5004 (with health: /api/health)"
     echo "   CoreBanking:      http://localhost:8005"
     echo "   Database:         localhost:5432"
     echo ""
@@ -327,6 +334,12 @@ health_check() {
         print_success "✅ Payment Service health check passed"
     else
         print_error "❌ Payment Service health check failed"
+    fi
+
+    if curl -s "http://localhost:5004/api/health" >/dev/null 2>&1; then
+        print_success "✅ Payee Service health check passed"
+    else
+        print_error "❌ Payee Service health check failed"
     fi
 
     # Frontend health checks

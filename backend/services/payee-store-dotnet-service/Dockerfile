@@ -4,6 +4,9 @@ EXPOSE 5004
 
 ENV ASPNETCORE_URLS=http://+:5004
 
+# Install curl for health checks
+USER root
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 USER app
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
@@ -26,7 +29,7 @@ WORKDIR /app
 COPY --from=publish /app/publish .
 
 # Add health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:5004/api/health || exit 1
 
 ENTRYPOINT ["dotnet", "PayeeService.dll"]

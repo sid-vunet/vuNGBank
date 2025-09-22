@@ -236,9 +236,10 @@ services:
       - vubank-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5004/api/health"]
-      interval: 15s
-      timeout: 10s
+      interval: 30s
+      timeout: 3s
       retries: 5
+      start_period: 30s
 
   # React Frontend (optional - can run locally)
   vubank-frontend:

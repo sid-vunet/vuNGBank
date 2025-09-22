@@ -179,34 +179,111 @@ namespace PayeeService.Controllers
     public class HealthController : ControllerBase
     {
         private readonly PayeeService.Data.PayeeDbContext _context;
+        private readonly ILogger<HealthController> _logger;
 
-        public HealthController(PayeeService.Data.PayeeDbContext context)
+        public HealthController(PayeeService.Data.PayeeDbContext context, ILogger<HealthController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
+        /// <summary>
+        /// Comprehensive health check endpoint
+        /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> GetHealth()
         {
             try
             {
-                // Check database connectivity
-                await _context.Database.CanConnectAsync();
-                return Ok(new { 
-                    status = "healthy", 
-                    timestamp = DateTime.UtcNow,
-                    service = "payee-service",
-                    version = "1.0.0"
-                });
+                var healthData = new
+                {
+                    status = "healthy",
+                    service = "vubank-payee-service",
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    version = "1.0.0",
+                    environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+                    uptime = GetUptime(),
+                    memory = GetMemoryInfo(),
+                    dependencies = await GetDependenciesHealth()
+                };
+
+                _logger.LogDebug("Health check completed successfully");
+                return Ok(healthData);
             }
             catch (Exception ex)
             {
-                return StatusCode(503, new { 
-                    status = "unhealthy", 
-                    timestamp = DateTime.UtcNow,
-                    error = ex.Message 
-                });
+                _logger.LogError(ex, "Health check failed");
+                
+                var unhealthyData = new
+                {
+                    status = "unhealthy",
+                    service = "vubank-payee-service",
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    error = ex.Message
+                };
+
+                return StatusCode(503, unhealthyData);
             }
+        }
+
+        /// <summary>
+        /// Simple status endpoint
+        /// </summary>
+        [HttpGet("status")]
+        public IActionResult GetStatus()
+        {
+            var statusData = new
+            {
+                status = "ok",
+                service = "vubank-payee-service",
+                timestamp = DateTime.UtcNow.ToString("O")
+            };
+
+            return Ok(statusData);
+        }
+
+        private static string GetUptime()
+        {
+            var uptime = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
+            return $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+        }
+
+        private static object GetMemoryInfo()
+        {
+            var process = System.Diagnostics.Process.GetCurrentProcess();
+            return new
+            {
+                workingSet = FormatBytes(process.WorkingSet64),
+                privateMemory = FormatBytes(process.PrivateMemorySize64),
+                gcMemory = FormatBytes(GC.GetTotalMemory(false)),
+                maxWorkingSet = FormatBytes(process.MaxWorkingSet.ToInt64())
+            };
+        }
+
+        private async Task<object> GetDependenciesHealth()
+        {
+            var dependencies = new Dictionary<string, string>();
+
+            // Check database connectivity
+            try
+            {
+                var canConnect = await _context.Database.CanConnectAsync();
+                dependencies["database"] = canConnect ? "healthy" : "unhealthy";
+            }
+            catch (Exception ex)
+            {
+                dependencies["database"] = $"unhealthy: {ex.Message}";
+            }
+
+            return dependencies;
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 1024) return $"{bytes} B";
+            if (bytes < 1024 * 1024) return $"{bytes / 1024:F1} KB";
+            if (bytes < 1024 * 1024 * 1024) return $"{bytes / (1024 * 1024):F1} MB";
+            return $"{bytes / (1024 * 1024 * 1024):F1} GB";
         }
     }
 }
