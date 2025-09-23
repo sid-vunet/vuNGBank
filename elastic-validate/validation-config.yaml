@@ -1,0 +1,104 @@
+# VuBank APM Validation Configuration
+# This file defines validation test suites for bulk validation
+
+validation_suites:
+  login_flow:
+    name: "Login Flow Validation"
+    tests:
+      - service: "vubank-login-service" 
+        transaction: "POST /api/login"
+        validate_headers: true
+        validate_body: true
+        type: "apm"
+      
+      - service: "login-python-authenticator"
+        transaction: "POST /api/validate"
+        validate_headers: true
+        validate_body: true
+        type: "apm"
+        
+      - service: "vubank-frontend"
+        page: "login-page-load" 
+        type: "rum"
+
+  payment_flow:
+    name: "Payment Flow Validation"
+    tests:
+      - service: "payment-process-java-service"
+        transaction: "POST /api/payment/transfer"
+        validate_headers: true
+        validate_body: true
+        type: "apm"
+        
+      - service: "corebanking-java-service"
+        transaction: "GET /api/accounts"
+        validate_headers: true
+        type: "apm"
+        
+      - service: "pdf-receipt-java-service"
+        transaction: "POST /api/receipt/generate"
+        validate_headers: true
+        validate_body: true
+        type: "apm"
+
+  account_management:
+    name: "Account Management Validation"
+    tests:
+      - service: "accounts-go-service"
+        transaction: "GET /api/balance"
+        validate_headers: true
+        type: "apm"
+        
+      - service: "accounts-go-service"
+        transaction: "POST /api/account/details"
+        validate_headers: true
+        validate_body: true
+        type: "apm"
+
+  payee_management:
+    name: "Payee Management Validation"
+    tests:
+      - service: "payee-store-dotnet-service"
+        transaction: "GET /api/payees"
+        validate_headers: true
+        type: "apm"
+        
+      - service: "payee-store-dotnet-service"
+        transaction: "POST /api/payee"
+        validate_headers: true
+        validate_body: true
+        type: "apm"
+
+# Service health check configuration
+health_checks:
+  services:
+    - "vubank-frontend"
+    - "vubank-login-service"
+    - "payment-process-java-service"
+    - "corebanking-java-service"
+    - "accounts-go-service"
+    - "payee-store-dotnet-service"
+    - "pdf-receipt-java-service"
+    - "login-python-authenticator"
+  
+  time_range: "1h"
+  
+  thresholds:
+    error_rate_max: 5.0  # Max 5% error rate
+    response_time_p95_max: 2000  # Max 2 seconds for p95
+    data_freshness_max: 300  # Max 5 minutes old
+
+# Elasticsearch configuration
+elasticsearch:
+  url: "http://91.203.133.240:8082"
+  index_pattern: ".ds-*"
+  timeout: "30s"
+  max_results: 1000
+
+# Output configuration
+output:
+  format: "console"  # console, json, html
+  colors: true
+  debug: false
+  save_results: false
+  results_file: "validation-results.json"
