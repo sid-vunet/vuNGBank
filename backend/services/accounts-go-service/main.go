@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,13 +19,26 @@ import (
 	_ "go.elastic.co/apm/module/apmsql/v2/pq"
 )
 
-// Config struct
+// Config struct with comprehensive APM configuration
 type Config struct {
-	Port           string
-	JWTSecret      string
-	DBConfig       DBConfig
-	APMServerURL   string
-	APMServiceName string
+	Port      string
+	JWTSecret string
+	DBConfig  DBConfig
+
+	// Comprehensive APM Configuration (matching RUM setup)
+	APMServerURL          string
+	APMServiceName        string
+	APMServiceVersion     string
+	APMEnvironment        string
+	APMTransactionSample  float64
+	APMSpanSample         float64
+	APMCaptureBody        string
+	APMCaptureHeaders     bool
+	APMDistributedTracing bool
+	APMLogLevel           string
+	APMRecordingEnabled   bool
+	APMStackTraceLimit    int
+	APMSpanStackTraceMin  string
 }
 
 type DBConfig struct {
@@ -111,11 +126,17 @@ type Claims struct {
 
 // Load configuration
 func loadConfig() *Config {
+	// Parse APM configuration with defaults matching RUM setup
+	transactionSample, _ := strconv.ParseFloat(getEnv("ELASTIC_APM_TRANSACTION_SAMPLE_RATE", "1.0"), 64)
+	spanSample, _ := strconv.ParseFloat(getEnv("ELASTIC_APM_SPAN_SAMPLE_RATE", "1.0"), 64)
+	captureHeaders, _ := strconv.ParseBool(getEnv("ELASTIC_APM_CAPTURE_HEADERS", "true"))
+	distributedTracing, _ := strconv.ParseBool(getEnv("ELASTIC_APM_USE_DISTRIBUTED_TRACING", "true"))
+	recordingEnabled, _ := strconv.ParseBool(getEnv("ELASTIC_APM_RECORDING", "true"))
+	stackTraceLimit, _ := strconv.Atoi(getEnv("ELASTIC_APM_STACK_TRACE_LIMIT", "50"))
+
 	return &Config{
-		Port:           getEnv("PUBLIC_API_PORT", "8002"),
-		JWTSecret:      getEnv("JWT_SECRET", "your-super-secret-jwt-key"),
-		APMServerURL:   getEnv("ELASTIC_APM_SERVER_URL", "http://91.203.133.240:30200"),
-		APMServiceName: getEnv("ELASTIC_APM_SERVICE_NAME", "accounts-go-service"),
+		Port:      getEnv("PUBLIC_API_PORT", "8002"),
+		JWTSecret: getEnv("JWT_SECRET", "your-super-secret-jwt-key"),
 		DBConfig: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
@@ -124,6 +145,21 @@ func loadConfig() *Config {
 			DBName:   getEnv("DB_NAME", "vubank_db"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
+
+		// Comprehensive APM Configuration (matching RUM observability level)
+		APMServerURL:          getEnv("ELASTIC_APM_SERVER_URL", "http://91.203.133.240:30200"),
+		APMServiceName:        getEnv("ELASTIC_APM_SERVICE_NAME", "accounts-go-service"),
+		APMServiceVersion:     getEnv("ELASTIC_APM_SERVICE_VERSION", "1.0.0"),
+		APMEnvironment:        getEnv("ELASTIC_APM_ENVIRONMENT", "production"),
+		APMTransactionSample:  transactionSample,
+		APMSpanSample:         spanSample,
+		APMCaptureBody:        getEnv("ELASTIC_APM_CAPTURE_BODY", "all"),
+		APMCaptureHeaders:     captureHeaders,
+		APMDistributedTracing: distributedTracing,
+		APMLogLevel:           getEnv("ELASTIC_APM_LOG_LEVEL", "info"),
+		APMRecordingEnabled:   recordingEnabled,
+		APMStackTraceLimit:    stackTraceLimit,
+		APMSpanStackTraceMin:  getEnv("ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION", "0s"),
 	}
 }
 
@@ -592,15 +628,46 @@ func healthHandler(db *sql.DB) gin.HandlerFunc {
 func main() {
 	config := loadConfig()
 
-	// Initialize APM
-	log.Printf("Initializing APM with server URL: %s", config.APMServerURL)
-	log.Printf("APM Service Name: %s", config.APMServiceName)
+	// Initialize comprehensive APM (matching RUM observability)
+	if config.APMServerURL != "" {
+		log.Printf("🔧 Initializing comprehensive APM configuration...")
 
-	// Set APM environment variables
-	os.Setenv("ELASTIC_APM_SERVER_URL", config.APMServerURL)
-	os.Setenv("ELASTIC_APM_SERVICE_NAME", config.APMServiceName)
-	os.Setenv("ELASTIC_APM_ENVIRONMENT", getEnv("ELASTIC_APM_ENVIRONMENT", "production"))
-	os.Setenv("ELASTIC_APM_SERVICE_VERSION", getEnv("ELASTIC_APM_SERVICE_VERSION", "1.0.0"))
+		// Set comprehensive APM environment variables for maximum observability
+		os.Setenv("ELASTIC_APM_SERVER_URL", config.APMServerURL)
+		os.Setenv("ELASTIC_APM_SERVICE_NAME", config.APMServiceName)
+		os.Setenv("ELASTIC_APM_SERVICE_VERSION", config.APMServiceVersion)
+		os.Setenv("ELASTIC_APM_ENVIRONMENT", config.APMEnvironment)
+
+		// Sampling configuration (100% like RUM)
+		os.Setenv("ELASTIC_APM_TRANSACTION_SAMPLE_RATE", fmt.Sprintf("%.2f", config.APMTransactionSample))
+		os.Setenv("ELASTIC_APM_SPAN_SAMPLE_RATE", fmt.Sprintf("%.2f", config.APMSpanSample))
+
+		// Data capture configuration (maximum like RUM)
+		os.Setenv("ELASTIC_APM_CAPTURE_BODY", config.APMCaptureBody)
+		os.Setenv("ELASTIC_APM_CAPTURE_HEADERS", strconv.FormatBool(config.APMCaptureHeaders))
+
+		// Distributed tracing configuration
+		os.Setenv("ELASTIC_APM_USE_DISTRIBUTED_TRACING", strconv.FormatBool(config.APMDistributedTracing))
+
+		// Advanced configuration for maximum observability
+		os.Setenv("ELASTIC_APM_LOG_LEVEL", config.APMLogLevel)
+		os.Setenv("ELASTIC_APM_RECORDING", strconv.FormatBool(config.APMRecordingEnabled))
+		os.Setenv("ELASTIC_APM_STACK_TRACE_LIMIT", strconv.Itoa(config.APMStackTraceLimit))
+		os.Setenv("ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION", config.APMSpanStackTraceMin)
+
+		// Database monitoring specific settings
+		os.Setenv("ELASTIC_APM_DISABLE_METRICS", "false")
+		os.Setenv("ELASTIC_APM_METRICS_INTERVAL", "30s")
+		os.Setenv("ELASTIC_APM_MAX_QUEUE_SIZE", "1000")
+		os.Setenv("ELASTIC_APM_FLUSH_INTERVAL", "1s")
+		os.Setenv("ELASTIC_APM_TRANSACTION_MAX_SPANS", "500")
+
+		log.Printf("✅ APM Configuration Applied:")
+		log.Printf("   Server: %s", config.APMServerURL)
+		log.Printf("   Service: %s v%s (%s)", config.APMServiceName, config.APMServiceVersion, config.APMEnvironment)
+		log.Printf("   Sampling: Transactions=%.0f%%, Spans=%.0f%%", config.APMTransactionSample*100, config.APMSpanSample*100)
+		log.Printf("   Database: Enhanced SQL query monitoring enabled")
+	}
 
 	// Connect to database
 	db, err := connectDB(config.DBConfig)
@@ -616,14 +683,20 @@ func main() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
-	// Add APM middleware
-	r.Use(apmgin.Middleware(r))
+	// Add comprehensive APM middleware
+	if config.APMServerURL != "" {
+		r.Use(apmgin.Middleware(r))
+		log.Printf("✅ APM Gin middleware enabled for comprehensive request tracing")
+	}
 
-	// Add CORS middleware
+	// Add enhanced CORS middleware with distributed tracing headers
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Api-Client, X-Request-ID, traceparent, tracestate")
+		c.Header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Api-Client, X-Request-ID, traceparent, tracestate, elastic-apm-traceparent")
+		c.Header("Access-Control-Expose-Headers", "X-Service-Name, X-Service-Version, traceparent, tracestate, elastic-apm-traceparent")
+		c.Header("X-Service-Name", config.APMServiceName)
+		c.Header("X-Service-Version", config.APMServiceVersion)
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)

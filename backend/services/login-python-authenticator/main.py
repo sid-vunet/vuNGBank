@@ -23,14 +23,20 @@ from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Elastic APM client
+# Initialize comprehensive Elastic APM client (matching Go services and RUM)
 apm_config = {
-    'SERVICE_NAME': os.getenv('ELASTIC_APM_SERVICE_NAME', 'vubank-auth-service'),
+    'SERVICE_NAME': os.getenv('ELASTIC_APM_SERVICE_NAME', 'login-python-authenticator'),
     'SERVER_URL': os.getenv('ELASTIC_APM_SERVER_URL', 'http://91.203.133.240:30200'),
     'ENVIRONMENT': os.getenv('ELASTIC_APM_ENVIRONMENT', 'production'),
     'SERVICE_VERSION': os.getenv('ELASTIC_APM_SERVICE_VERSION', '1.0.0'),
-    'CAPTURE_BODY': 'errors',
-    'CAPTURE_HEADERS': True,
+    'TRANSACTION_SAMPLE_RATE': float(os.getenv('ELASTIC_APM_TRANSACTION_SAMPLE_RATE', '1.0')),
+    'SPAN_SAMPLE_RATE': float(os.getenv('ELASTIC_APM_SPAN_SAMPLE_RATE', '1.0')),
+    'CAPTURE_BODY': 'all',  # Comprehensive body capture like Go services
+    'CAPTURE_HEADERS': False,  # Disable to avoid configuration issues
+    'USE_DISTRIBUTED_TRACING': True,
+    'DISTRIBUTED_TRACING_ORIGINS': ['*'],
+    'STACK_TRACE_LIMIT': 50,
+    'TRANSACTION_MAX_SPANS': 500,
     'LOG_LEVEL': 'info'
 }
 

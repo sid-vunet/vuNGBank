@@ -33,8 +33,11 @@
                 'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
                 'http://localhost:5004',
                 
-                // APM server
+                // APM server endpoints (IP and hostname variants)
                 'http://91.203.133.240:30200',
+                'http://apm-server:30200',
+                'https://91.203.133.240:30200',
+                'https://apm-server:30200',
                 
                 // Docker compose service names (internal network)
                 'http://vubank-frontend:3000',
@@ -2451,20 +2454,63 @@
                     // Generate request ID for tracing
                     const xRequestId = this.generateUUID();
                     
+                    // Prepare request headers
+                    const headers = {
+                        'Content-Type': 'application/xml',
+                        'X-Api-Client': 'web-portal',
+                        'X-Request-Id': xRequestId,
+                        'X-Signature': 'demo-signature-' + Date.now(), // Placeholder signature
+                        'Authorization': 'Bearer ' + token
+                    };
+                    
+                    // DETAILED FRONTEND REQUEST LOGGING
+                    console.log('=== FRONTEND API REQUEST DEBUG ===');
+                    console.log('URL:', 'http://localhost:8004/payments/transfer');
+                    console.log('Method:', 'POST');
+                    console.log('Headers:', headers);
+                    console.log('Token present:', !!token);
+                    console.log('Token length:', token ? token.length : 0);
+                    console.log('XML Payload length:', pacsXml.length);
+                    console.log('XML Preview:', pacsXml.substring(0, 200) + '...');
+                    console.log('Request ID:', xRequestId);
+                    console.log('Timestamp:', new Date().toISOString());
+                    console.log('=== END FRONTEND REQUEST DEBUG ===');
+                    
                     // Call payment-process-java-service
                     const response = await fetch('http://localhost:8004/payments/transfer', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/xml',
-                            'X-Api-Client': 'web-portal',
-                            'X-Request-Id': xRequestId,
-                            'X-Signature': 'demo-signature-' + Date.now(), // Placeholder signature
-                            'Authorization': 'Bearer ' + token
-                        },
+                        headers: headers,
                         body: pacsXml
                     });
 
-                    const responseData = await response.json();
+                    // DETAILED FRONTEND RESPONSE LOGGING
+                    console.log('=== FRONTEND API RESPONSE DEBUG ===');
+                    console.log('Response Status:', response.status);
+                    console.log('Response OK:', response.ok);
+                    console.log('Response Status Text:', response.statusText);
+                    console.log('Response Headers:');
+                    for (let [key, value] of response.headers.entries()) {
+                        console.log(`  ${key}: ${value}`);
+                    }
+                    console.log('Response Type:', response.type);
+                    console.log('Response URL:', response.url);
+                    console.log('=== END FRONTEND RESPONSE DEBUG ===');
+                    
+                    const responseText = await response.text();
+                    console.log('=== RESPONSE BODY DEBUG ===');
+                    console.log('Raw Response Body:', responseText);
+                    console.log('Response Body Length:', responseText.length);
+                    
+                    let responseData;
+                    try {
+                        responseData = JSON.parse(responseText);
+                        console.log('Parsed JSON Response:', responseData);
+                    } catch (parseError) {
+                        console.error('Failed to parse JSON response:', parseError);
+                        console.log('Non-JSON response body:', responseText);
+                        throw new Error('Invalid JSON response from server');
+                    }
+                    console.log('=== END RESPONSE BODY DEBUG ===');
 
                     if (response.status === 202) {
                         return {
@@ -2484,7 +2530,13 @@
                         };
                     }
                 } catch (error) {
-                    console.error('Transfer initiation error:', error);
+                    console.error('=== FRONTEND ERROR DEBUG ===');
+                    console.error('Error Type:', error.constructor.name);
+                    console.error('Error Message:', error.message);
+                    console.error('Error Stack:', error.stack);
+                    console.error('Full Error Object:', error);
+                    console.error('=== END FRONTEND ERROR DEBUG ===');
+                    
                     return {
                         success: false,
                         message: error.message || 'Network error occurred'

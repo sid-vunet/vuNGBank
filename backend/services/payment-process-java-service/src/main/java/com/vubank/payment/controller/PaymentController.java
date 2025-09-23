@@ -62,6 +62,21 @@ public class PaymentController {
         MDC.put("xRequestId", xRequestId);
         MDC.put("xApiClient", xApiClient);
 
+        // DETAILED REQUEST LOGGING for debugging
+        logger.info("=== PAYMENT API REQUEST DEBUG ===");
+        logger.info("Request ID: {}", xRequestId);
+        logger.info("API Client: {}", xApiClient);
+        logger.info("Content-Type: {}", contentType);
+        logger.info("Authorization: {}", authorization != null ? "Bearer [token present]" : "Not provided");
+        logger.info("X-Signature: {}", xSignature);
+        logger.info("Idempotency-Key: {}", idempotencyKey);
+        logger.info("Traceparent: {}", traceparent);
+        logger.info("Tracestate: {}", tracestate);
+        logger.info("XML Payload length: {} chars", xmlPayload != null ? xmlPayload.length() : 0);
+        logger.info("XML Payload preview: {}", xmlPayload != null && xmlPayload.length() > 100 ? 
+            xmlPayload.substring(0, 100) + "..." : xmlPayload);
+        logger.info("=== END REQUEST DEBUG ===");
+
         logger.info("Received payment transfer request - xRequestId: {}, xApiClient: {}", xRequestId, xApiClient);
 
         try {
@@ -132,13 +147,24 @@ public class PaymentController {
                 .body(new PaymentResponse(txnRef, "IN_PROGRESS"));
 
         } catch (IllegalArgumentException e) {
-            logger.error("Validation error for xRequestId: {} - {}", xRequestId, e.getMessage());
-            return ResponseEntity.badRequest()
-                .body(new PaymentResponse(null, "FAILED", "Validation error: " + e.getMessage()));
+            logger.error("=== PAYMENT API VALIDATION ERROR ===");
+            logger.error("Request ID: {}", xRequestId);
+            logger.error("Error Message: {}", e.getMessage());
+            logger.error("Stack trace: ", e);
+            logger.error("=== END VALIDATION ERROR ===");
+            
+            PaymentResponse errorResponse = new PaymentResponse(null, "FAILED", "Validation error: " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         } catch (Exception e) {
-            logger.error("Unexpected error for xRequestId: {}", xRequestId, e);
-            return ResponseEntity.internalServerError()
-                .body(new PaymentResponse(null, "FAILED", "Internal server error"));
+            logger.error("=== PAYMENT API UNEXPECTED ERROR ===");
+            logger.error("Request ID: {}", xRequestId);
+            logger.error("Error Class: {}", e.getClass().getSimpleName());
+            logger.error("Error Message: {}", e.getMessage());
+            logger.error("Full stack trace: ", e);
+            logger.error("=== END UNEXPECTED ERROR ===");
+            
+            PaymentResponse errorResponse = new PaymentResponse(null, "FAILED", "Internal server error");
+            return ResponseEntity.internalServerError().body(errorResponse);
         } finally {
             // Clear MDC
             MDC.clear();

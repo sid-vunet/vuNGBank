@@ -105,30 +105,16 @@ check_status() {
         print_error "❌ PostgreSQL Database (5432) - Not Running"
     fi
 
-    # Check Frontend services (Docker containers)
-    if docker compose ps | grep -q "vubank-frontend.*Up"; then
-        print_success "✅ React Frontend (3000) - Running"
-    else
-        print_error "❌ React Frontend (3000) - Not Running"
-    fi
-    
+    # Check HTML Frontend Container
     if docker compose ps | grep -q "vubank-html-frontend.*Up"; then
         print_success "✅ HTML Frontend (3001) - Running"
     else
         print_error "❌ HTML Frontend (3001) - Not Running"
     fi
-
-    # Check Frontend (HTML Server) - legacy local server
-    if lsof -i :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
-        print_success "✅ HTML Frontend Server (3001) - Running"
-    else
-        print_error "❌ HTML Frontend Server (3001) - Not Running"
-    fi
     
     echo ""
     echo "🔗 Service URLs:"
-    echo "   React Frontend:   http://localhost:3000 (with health: /health)"
-    echo "   HTML Frontend:    http://localhost:3001 (with health: /health)"
+    echo "   HTML Frontend:    http://localhost:3001"
     echo "   Login API:        http://localhost:8000"
     echo "   Auth Service:     http://localhost:8001"
     echo "   Accounts API:     http://localhost:8002"
@@ -146,17 +132,8 @@ start_services() {
     print_status "Starting all services..."
     echo ""
     
-    # Check frontend preference
-    if [[ "$2" == "html-container" ]]; then
-        start_services_with_html_container
-        return
-    elif [[ "$2" == "react-container" ]]; then
-        start_services_with_react_container
-        return
-    fi
-    
-    # Default: Start with simple HTML server
-    start_services_with_html_server
+    # Start with HTML frontend container
+    start_services_with_html_container
 }
 
 # Start services with HTML container
@@ -176,64 +153,15 @@ start_services_with_html_container() {
 }
 
 # Start services with React container  
-start_services_with_react_container() {
-    print_status "Starting services with React frontend container..."
-    
-    # Start Docker services with React frontend profile
-    print_status "Starting Docker services with React frontend..."
-    docker compose --profile frontend up -d
-    
-    print_success "All services started with React frontend container!"
-    check_status
-}
-
-# Start services with simple HTML server (original method)
-start_services_with_html_server() {
-    print_status "Starting services with simple HTML server..."
-    
-    # Clean up any existing processes on port 3001 before starting
-    if lsof -i :3001 >/dev/null 2>&1; then
-        print_status "Cleaning up existing processes on port 3001..."
-        lsof -ti :3001 | xargs kill -9 2>/dev/null || true
-        sleep 2
-    fi
-    
-    # Start Docker services
-    print_status "Starting Docker services..."
-    docker compose up -d
-    
-    # Wait for services to be healthy
-    print_status "Waiting for services to be healthy..."
-    sleep 10
-    
-    # Start frontend
-    print_status "Starting HTML frontend server..."
-    ./frontend-server.sh start
-    
-    print_success "All services started!"
-    check_status
-}
-
 # Stop all services
 stop_services() {
     print_header
     print_status "Stopping all services..."
     echo ""
     
-    # Stop frontend
-    print_status "Stopping HTML frontend server..."
-    ./frontend-server.sh stop
-    
-    # Kill any remaining React or other frontend processes on port 3001
-    print_status "Cleaning up any remaining frontend processes..."
-    if lsof -i :3001 >/dev/null 2>&1; then
-        print_status "Found processes using port 3001, terminating them..."
-        lsof -ti :3001 | xargs kill -9 2>/dev/null || true
-    fi
-    
-    # Stop Docker services
+    # Stop Docker services (including HTML frontend container)
     print_status "Stopping Docker services..."
-    docker compose down
+    docker compose --profile html-frontend down
     
     print_success "All services stopped!"
 }
@@ -370,11 +298,11 @@ show_help() {
     print_header
     echo "VuNG Bank Service Management Script"
     echo ""
-    echo "Usage: ./manage-services.sh [command] [frontend-option]"
+    echo "Usage: ./manage-services.sh [command]"
     echo ""
     echo "Commands:"
     echo "  status    - Check status of all services"
-    echo "  start     - Start all services (default: HTML server)"
+    echo "  start     - Start all services with HTML frontend container"
     echo "  stop      - Stop all services"
     echo "  restart   - Restart all services"
     echo "  install   - Install dependencies and setup"
@@ -382,15 +310,10 @@ show_help() {
     echo "  health    - Run health checks"
     echo "  help      - Show this help message"
     echo ""
-    echo "Frontend Options (for start/restart commands):"
-    echo "  html-server     - Traditional HTML server (Python, default)"
-    echo "  html-container  - HTML Multi-Page App in Docker container"
-    echo "  react-container - React SPA in Docker container"
-    echo ""
     echo "Examples:"
-    echo "  ./manage-services.sh start                    # HTML server (default)"
-    echo "  ./manage-services.sh start html-container     # HTML in container" 
-    echo "  ./manage-services.sh start react-container    # React in container"
+    echo "  ./manage-services.sh start                    # Start all services"
+    echo "  ./manage-services.sh status                   # Check service status"
+    echo "  ./manage-services.sh restart                  # Restart all services"
     echo ""
     echo "Services managed:"
     echo "  • PostgreSQL Database (port 5432)"
@@ -398,8 +321,10 @@ show_help() {
     echo "  • Python Auth Service (port 8001)"
     echo "  • Go Accounts Service (port 8002)"
     echo "  • Java PDF Receipt Service (port 8003)"
+    echo "  • Java Payment Service (port 8004)"
     echo "  • Java CoreBanking Service (port 8005)"
-    echo "  • HTML Frontend Server (port 3001)"
+    echo "  • .NET Payee Service (port 5004)"
+    echo "  • HTML Frontend Container (port 3001)"
     echo ""
 }
 
@@ -409,7 +334,7 @@ case "${1:-help}" in
         check_status
         ;;
     "start")
-        start_services "$1" "$2"
+        start_services
         ;;
     "stop")
         stop_services

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment API Test - Without RUM</title>
+</head>
+<body>
+    <h1>Payment API Test (No RUM Agent)</h1>
+    <button id="testBtn">Test Payment API</button>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('testBtn').addEventListener('click', async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const testXml = `<?xml version="1.0" encoding="UTF-8"?>
+<PaymentInstruction>
+    <PayeeName>Test Payee</PayeeName>
+    <IFSCCode>ABCD0123456</IFSCCode>
+    <PaymentType>NEFT</PaymentType>
+    <DateTime>2025-09-23T03:26:00.000Z</DateTime>
+    <CustomerName>testuser</CustomerName>
+    <FromAccountNo>1234567890</FromAccountNo>
+    <ToAccountNo>0987654321</ToAccountNo>
+    <BranchName>Test Branch</BranchName>
+    <Amount>100</Amount>
+    <Comments>Test transfer</Comments>
+</PaymentInstruction>`;
+
+                const response = await fetch('http://localhost:8004/payments/transfer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'X-Api-Client': 'web-portal',
+                        'X-Request-Id': 'test-' + Date.now(),
+                        'X-Signature': 'demo-signature-' + Date.now(),
+                        'Authorization': 'Bearer test-token'
+                    },
+                    body: testXml
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                const responseText = await response.text();
+                console.log('Response body:', responseText);
+                
+                resultDiv.innerHTML = `
+                    <h3>Result:</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Response:</strong> ${responseText}</p>
+                    <p><strong>Success:</strong> ${response.ok ? 'Yes' : 'No'}</p>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `<h3>Error:</h3><p>${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>

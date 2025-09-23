@@ -53,11 +53,18 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- Elastic APM Java Agent -->
+        <!-- Elastic APM Agent -->
         <dependency>
             <groupId>co.elastic.apm</groupId>
-            <artifactId>elastic-apm-agent</artifactId>
-            <version>1.42.0</version>
+            <artifactId>apm-agent-attach</artifactId>
+            <version>1.45.0</version>
+        </dependency>
+        
+        <!-- Elastic APM API for manual instrumentation -->
+        <dependency>
+            <groupId>co.elastic.apm</groupId>
+            <artifactId>apm-agent-api</artifactId>
+            <version>1.45.0</version>
         </dependency>
 
         <!-- Spring Boot Test -->
