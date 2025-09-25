@@ -7,12 +7,24 @@
 // Enhanced logging for APM initialization and tracing
 console.log('🔧 Initializing Elastic APM RUM Agent for VuNG Bank...');
 
+// Detect environment from URL/hostname
+const getAPMEnvironment = () => {
+    const hostname = window.location.hostname;
+    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+        return 'development';
+    } else if (hostname.includes('91.203.133.240')) {
+        return 'e2e-240-dev';
+    } else {
+        return 'production';
+    }
+};
+
 // Global APM configuration
 const APM_CONFIG = {
     // Service identification
     serviceName: 'vubank-html-frontend',
     serviceVersion: '1.2.0',
-    environment: 'production',
+    environment: getAPMEnvironment(),
     
     // APM Server connection (using browser-accessible URL)
     serverUrl: 'http://91.203.133.240:30200',

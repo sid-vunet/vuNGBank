@@ -17,12 +17,24 @@
     <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
         // Initialize Elastic RUM with MAXIMUM automatic data capture
+        // Detect environment from URL/hostname
+        const getAPMEnvironment = () => {
+            const hostname = window.location.hostname;
+            if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+                return 'development';
+            } else if (hostname.includes('91.203.133.240')) {
+                return 'e2e-240-dev';
+            } else {
+                return 'production';
+            }
+        };
+
         window.elasticApm = elasticApm.init({
             // === CORE CONFIGURATION ===
             serviceName: 'vubank-frontend',
             serverUrl: 'http://91.203.133.240:30200',
             serviceVersion: '1.0.0',
-            environment: 'production',
+            environment: getAPMEnvironment(),
             
             // === DISTRIBUTED TRACING (Temporarily disabled to eliminate CORS errors) ===
             distributedTracing: true,
