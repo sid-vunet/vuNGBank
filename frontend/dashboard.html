@@ -10,9 +10,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Elastic RUM Agent -->
-    <script src="./elastic-apm-rum.js" crossorigin></script>
+    <!-- Elastic RUM Agent - Temporarily Disabled -->
+    <!-- <script src="./elastic-apm-rum.js" crossorigin></script> -->
     <script>
+        // Initialize mock APM object to prevent errors
+        window.elasticApm = {
+            init: () => ({}),
+            setUserContext: () => {},
+            setCustomContext: () => {},
+            addLabels: () => {},
+            startTransaction: () => ({ end: () => {} }),
+            startSpan: () => ({ end: () => {} })
+        };
+        /*
         // Initialize Elastic RUM with MAXIMUM automatic data capture
         window.elasticApm = elasticApm.init({
             // === CORE CONFIGURATION ===
@@ -144,7 +154,7 @@
             
             // Enable active monitoring
             active: true
-        });
+        }); */
         
         // Enhanced authentication validation function
         async function validateAuthenticationOnLoad() {

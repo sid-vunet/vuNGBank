@@ -1678,9 +1678,9 @@
                     this.user = JSON.parse(userStr);
                     this.updateUserInfo();
 
-                    // Load account data from accounts service directly
+                    // Load account data from accounts service via Kong Gateway
                     const apiUrl = 'http://localhost:8086'; // Kong Gateway API URL
-                    const response = await fetch(`${apiUrl}/internal/accounts`, {
+                    const response = await fetch(`${apiUrl}/api/accounts`, {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -2766,7 +2766,7 @@
                     };
 
                     // Call PDF generation service
-                    const response = await fetch('http://localhost:8086/api/receipts/generate-receipt', {
+                    const response = await fetch('http://localhost:8086/api/pdf/generate-receipt', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -2822,10 +2822,10 @@
                 // Clear PIN
                 this.pinInputs.forEach(input => input.value = '');
                 
-                // Reset buttons
-                this.continueToStep2.disabled = true;
-                this.continueToStep3.disabled = true;
-                this.processTransferBtn.disabled = true;
+                // Reset buttons (with safety checks)
+                if (this.continueToStep2) this.continueToStep2.disabled = true;
+                if (this.continueToStep3) this.continueToStep3.disabled = true;
+                if (this.processTransferBtn) this.processTransferBtn.disabled = true;
             }
 
             goToDashboard() {
