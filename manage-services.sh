@@ -20,6 +20,64 @@ KONG_GATEWAY_PORT=8086
 KONG_ADMIN_PORT=8001
 BACKEND_API_PORT=8000  # Now internal only
 
+# ============================================================================
+# 📊 CENTRALIZED APM CONFIGURATION (Applied to ALL Services)
+# ============================================================================
+# Update these values to configure APM across all backend and frontend services
+
+# APM Server Configuration
+export ELASTIC_APM_SERVER_URL="${ELASTIC_APM_SERVER_URL:-http://91.203.133.240:30200}"
+export ELASTIC_APM_ENVIRONMENT="${ELASTIC_APM_ENVIRONMENT:-production}"
+export ELASTIC_APM_SERVICE_VERSION="${ELASTIC_APM_SERVICE_VERSION:-1.0.0}"
+
+# Sampling Configuration (100% for maximum observability)
+export ELASTIC_APM_TRANSACTION_SAMPLE_RATE="${ELASTIC_APM_TRANSACTION_SAMPLE_RATE:-1.0}"
+export ELASTIC_APM_SPAN_SAMPLE_RATE="${ELASTIC_APM_SPAN_SAMPLE_RATE:-1.0}"
+
+# Data Capture Configuration (Maximum capture for all services)
+export ELASTIC_APM_CAPTURE_BODY="${ELASTIC_APM_CAPTURE_BODY:-all}"
+export ELASTIC_APM_CAPTURE_HEADERS="${ELASTIC_APM_CAPTURE_HEADERS:-true}"
+
+# Distributed Tracing Configuration
+export ELASTIC_APM_USE_DISTRIBUTED_TRACING="${ELASTIC_APM_USE_DISTRIBUTED_TRACING:-true}"
+
+# Advanced Configuration for Maximum Observability
+export ELASTIC_APM_LOG_LEVEL="${ELASTIC_APM_LOG_LEVEL:-info}"
+export ELASTIC_APM_RECORDING="${ELASTIC_APM_RECORDING:-true}"
+export ELASTIC_APM_STACK_TRACE_LIMIT="${ELASTIC_APM_STACK_TRACE_LIMIT:-50}"
+export ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION="${ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION:-0ms}"
+
+# Performance Monitoring Settings
+export ELASTIC_APM_DISABLE_METRICS="${ELASTIC_APM_DISABLE_METRICS:-false}"
+export ELASTIC_APM_METRICS_INTERVAL="${ELASTIC_APM_METRICS_INTERVAL:-30s}"
+export ELASTIC_APM_MAX_QUEUE_SIZE="${ELASTIC_APM_MAX_QUEUE_SIZE:-1000}"
+export ELASTIC_APM_FLUSH_INTERVAL="${ELASTIC_APM_FLUSH_INTERVAL:-1s}"
+export ELASTIC_APM_TRANSACTION_MAX_SPANS="${ELASTIC_APM_TRANSACTION_MAX_SPANS:-500}"
+
+# Java-specific configuration
+export ELASTIC_APM_SPAN_FRAMES_MIN_DURATION="${ELASTIC_APM_SPAN_FRAMES_MIN_DURATION:-0ms}"
+export ELASTIC_APM_ENABLE_LOG_CORRELATION="${ELASTIC_APM_ENABLE_LOG_CORRELATION:-true}"
+export ELASTIC_APM_PROFILING_INFERRED_SPANS_ENABLED="${ELASTIC_APM_PROFILING_INFERRED_SPANS_ENABLED:-true}"
+export ELASTIC_APM_PROFILING_INFERRED_SPANS_MIN_DURATION="${ELASTIC_APM_PROFILING_INFERRED_SPANS_MIN_DURATION:-0ms}"
+export ELASTIC_APM_INSTRUMENT="${ELASTIC_APM_INSTRUMENT:-true}"
+
+# .NET-specific configuration  
+export ELASTIC_APM_SERVER_URLS="${ELASTIC_APM_SERVER_URL}"
+
+print_apm_config() {
+    echo ""
+    echo "📊 Centralized APM Configuration:"
+    echo "   Server URL: $ELASTIC_APM_SERVER_URL"
+    echo "   Environment: $ELASTIC_APM_ENVIRONMENT" 
+    echo "   Version: $ELASTIC_APM_SERVICE_VERSION"
+    echo "   Sampling: ${ELASTIC_APM_TRANSACTION_SAMPLE_RATE}% transactions, ${ELASTIC_APM_SPAN_SAMPLE_RATE}% spans"
+    echo "   Capture: Body=$ELASTIC_APM_CAPTURE_BODY, Headers=$ELASTIC_APM_CAPTURE_HEADERS"
+    echo "   Distributed Tracing: $ELASTIC_APM_USE_DISTRIBUTED_TRACING"
+    echo "   Log Level: $ELASTIC_APM_LOG_LEVEL"
+    echo ""
+}
+# ============================================================================
+
 #     echo "Services managed:"
     echo "  🌐 Kong API Gateway (port 8086) - MAIN ENTRY POINT"
     echo "  🔧 Kong Admin API (port 8001)"
@@ -45,7 +103,7 @@ BACKEND_API_PORT=8000  # Now internal only
     echo "  ✅ CORS and security headers"
     echo "  ✅ Prometheus metrics collection"
     echo "  ✅ JWT authentication support"
-    echo "" output
+    print_apm_config output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -222,7 +280,7 @@ start_services_with_html_container() {
     print_success "All services started with Kong API Gateway (port 8086) and HTML frontend!"
     echo ""
     print_status "🔗 Access your application at: http://localhost:8086"
-    echo ""
+    print_apm_config
     check_status
 }
 
@@ -522,6 +580,32 @@ clean_cache() {
     echo ""
 }
 
+# Show APM configuration
+show_apm_config() {
+    print_header
+    echo "📊 Centralized APM Configuration for All Services"
+    echo ""
+    echo "Current Configuration:"
+    print_apm_config
+    echo "This configuration is automatically applied to:"
+    echo "  • All 7 backend services (Go, Python, .NET, Java)"
+    echo "  • Frontend RUM agent"
+    echo "  • Kong API Gateway logging"
+    echo ""
+    echo "To modify these values:"
+    echo "  1. Edit the environment variables in this script (manage-services.sh)"
+    echo "  2. Or set them as system environment variables"
+    echo "  3. Restart services to apply changes: ./manage-services.sh restart"
+    echo ""
+    echo "Key Configuration Variables:"
+    echo "  ELASTIC_APM_SERVER_URL - APM server endpoint"
+    echo "  ELASTIC_APM_ENVIRONMENT - Environment (production/staging/dev)"
+    echo "  ELASTIC_APM_TRANSACTION_SAMPLE_RATE - Transaction sampling (0.0-1.0)"
+    echo "  ELASTIC_APM_CAPTURE_BODY - Body capture (all/errors/transactions/off)"
+    echo "  ELASTIC_APM_CAPTURE_HEADERS - Header capture (true/false)"
+    echo ""
+}
+
 # Display help
 show_help() {
     print_header
@@ -537,6 +621,7 @@ show_help() {
     echo "  install   - Install dependencies and setup"
     echo "  uninstall - Complete removal of all services, containers, images and volumes"
     echo "  clean-cache - Clean Docker build cache and force fresh builds"
+    echo "  apm-config - Show centralized APM configuration for all services"
     echo "  logs      - Show service logs"
     echo "  health    - Run health checks"
     echo "  help      - Show this help message"
@@ -544,6 +629,7 @@ show_help() {
     echo "Examples:"
     echo "  ./manage-services.sh start                    # Start all services"
     echo "  ./manage-services.sh status                   # Check service status"
+    echo "  ./manage-services.sh apm-config               # Show centralized APM configuration"
     echo "  ./manage-services.sh restart                  # Restart all services"
     echo "  ./manage-services.sh uninstall                # Remove everything (containers, images, volumes)"
     echo "  ./manage-services.sh clean-cache              # Clean Docker cache for fresh builds"
@@ -585,6 +671,9 @@ case "${1:-help}" in
         ;;
     "clean-cache")
         clean_cache
+        ;;
+    "apm-config")
+        show_apm_config
         ;;
     "logs")
         show_logs
