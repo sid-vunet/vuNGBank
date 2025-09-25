@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Elastic RUM Agent - Temporarily Disabled -->
-    <!-- <script src="./elastic-apm-rum.js" crossorigin></script> -->
+    <!-- Elastic RUM Agent -->
+    <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
         // Initialize Elastic RUM with MAXIMUM automatic data capture (Kong Gateway Configuration)
         window.elasticApm = elasticApm.init({
@@ -247,6 +247,20 @@
             if (!isValid) {
                 return; // Already redirected to login
             }
+        });
+        
+        // Debug RUM status
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (typeof window.elasticApm !== 'undefined') {
+                    console.log('✅ Elastic RUM is loaded and active');
+                    console.log('📊 RUM Service Name:', window.elasticApm._config?.serviceName);
+                    console.log('🔗 RUM Server URL:', window.elasticApm._config?.serverUrl);
+                    console.log('👆 User Interactions Enabled:', window.elasticApm._config?.captureUserInteractions);
+                } else {
+                    console.error('❌ Elastic RUM is not loaded!');
+                }
+            }, 1000);
         });
     </script>
     

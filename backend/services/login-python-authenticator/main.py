@@ -35,32 +35,32 @@ apm_config = {
     'SPAN_SAMPLE_RATE': float(os.getenv('ELASTIC_APM_SPAN_SAMPLE_RATE', '1.0')),
     
     # Data capture configuration (maximum like other services)
-    'CAPTURE_BODY': 'all',  # Comprehensive body capture like Go services
-    'CAPTURE_HEADERS': True,  # Enable comprehensive headers capture to match other services
+    'CAPTURE_BODY': os.getenv('ELASTIC_APM_CAPTURE_BODY', 'all'),  # Comprehensive body capture like Go services
+    'CAPTURE_HEADERS': os.getenv('ELASTIC_APM_CAPTURE_HEADERS', 'true').lower() == 'true',  # Enable comprehensive headers capture to match other services
     
     # Distributed tracing configuration (matching RUM distributedTracingOrigins)
-    'USE_DISTRIBUTED_TRACING': True,
+    'USE_DISTRIBUTED_TRACING': os.getenv('ELASTIC_APM_USE_DISTRIBUTED_TRACING', 'true').lower() == 'true',
     'DISTRIBUTED_TRACING_ORIGINS': ['*'],
     
     # Advanced configuration for maximum observability
-    'STACK_TRACE_LIMIT': 50,
-    'TRANSACTION_MAX_SPANS': 500,
+    'STACK_TRACE_LIMIT': int(os.getenv('ELASTIC_APM_STACK_TRACE_LIMIT', '50')),
+    'TRANSACTION_MAX_SPANS': int(os.getenv('ELASTIC_APM_TRANSACTION_MAX_SPANS', '500')),
     'SPAN_FRAMES_MIN_DURATION': 0,  # Capture all spans like other services
-    'LOG_LEVEL': 'info',
+    'LOG_LEVEL': os.getenv('ELASTIC_APM_LOG_LEVEL', 'info'),
     
     # Performance monitoring settings (matching other services)
-    'DISABLE_METRICS': False,  # Enable all metrics
-    'METRICS_INTERVAL': '30s',  # Frequent metrics collection
-    'MAX_QUEUE_SIZE': 1000,     # Large queue for high throughput
-    'FLUSH_INTERVAL': '1s',     # Fast flush for real-time monitoring
+    'DISABLE_METRICS': os.getenv('ELASTIC_APM_DISABLE_METRICS', 'false').lower() == 'true',  # Enable all metrics
+    'METRICS_INTERVAL': os.getenv('ELASTIC_APM_METRICS_INTERVAL', '30s'),  # Frequent metrics collection
+    'MAX_QUEUE_SIZE': int(os.getenv('ELASTIC_APM_MAX_QUEUE_SIZE', '1000')),     # Large queue for high throughput
+    'FLUSH_INTERVAL': os.getenv('ELASTIC_APM_FLUSH_INTERVAL', '1s'),     # Fast flush for real-time monitoring
     
     # Python-specific comprehensive monitoring
-    'INSTRUMENT': True,         # Enable all automatic instrumentation
+    'INSTRUMENT': os.getenv('ELASTIC_APM_INSTRUMENT', 'true').lower() == 'true',         # Enable all automatic instrumentation
     'DJANGO_TRANSACTION_NAME_FROM_ROUTE': True,  # Better transaction names
     'COLLECT_LOCAL_VARIABLES': 'all',  # Capture local variables in errors
     'SOURCE_LINES_ERROR_LIBRARY_FRAMES': 3,  # More context in error traces
     'SOURCE_LINES_SPAN_LIBRARY_FRAMES': 3,   # More context in span traces
-    'RECORDING': True,          # Ensure recording is enabled
+    'RECORDING': os.getenv('ELASTIC_APM_RECORDING', 'true').lower() == 'true',          # Ensure recording is enabled
     
     # Database and HTTP monitoring
     'DJANGO_DB_CAPTURE_QUERY': True,  # Capture database queries

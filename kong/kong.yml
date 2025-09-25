@@ -402,7 +402,7 @@ routes:
       - http
       - https
     paths:
-      - /api/health
+      - /api/payees/health
     methods:
       - GET
     strip_path: false

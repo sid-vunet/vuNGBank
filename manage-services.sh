@@ -20,6 +20,35 @@ KONG_GATEWAY_PORT=8086
 KONG_ADMIN_PORT=8001
 BACKEND_API_PORT=8000  # Now internal only
 
+# Service definitions (using simple arrays for compatibility)
+AVAILABLE_SERVICES="postgres kong-db kong-migrations kong login-python login-go accounts pdf payment corebanking payee frontend"
+
+get_container_name() {
+    case "$1" in
+        "postgres") echo "vubank-postgres" ;;
+        "kong-db") echo "kong-postgres" ;;
+        "kong-migrations") echo "kong-migrations" ;;
+        "kong") echo "vubank-kong-gateway" ;;
+        "login-python") echo "login-python-authenticator" ;;
+        "login-go") echo "login-go-service" ;;
+        "accounts") echo "accounts-go-service" ;;
+        "pdf") echo "pdf-receipt-java-service" ;;
+        "payment") echo "payment-process-java-service" ;;
+        "corebanking") echo "corebanking-java-service" ;;
+        "payee") echo "payee-store-dotnet-service" ;;
+        "frontend") echo "vubank-html-frontend" ;;
+        *) echo "" ;;
+    esac
+}
+
+get_service_profile() {
+    case "$1" in
+        "kong"|"kong-db"|"kong-migrations") echo "--profile kong" ;;
+        "frontend") echo "--profile html-frontend" ;;
+        *) echo "" ;;
+    esac
+}
+
 # ============================================================================
 # 📊 CENTRALIZED APM CONFIGURATION (Applied to ALL Services)
 # ============================================================================
@@ -27,7 +56,7 @@ BACKEND_API_PORT=8000  # Now internal only
 
 # APM Server Configuration
 export ELASTIC_APM_SERVER_URL="${ELASTIC_APM_SERVER_URL:-http://91.203.133.240:30200}"
-export ELASTIC_APM_ENVIRONMENT="${ELASTIC_APM_ENVIRONMENT:-production}"
+export ELASTIC_APM_ENVIRONMENT="${ELASTIC_APM_ENVIRONMENT:-dev-sid-mac}"
 export ELASTIC_APM_SERVICE_VERSION="${ELASTIC_APM_SERVICE_VERSION:-1.0.0}"
 
 # Sampling Configuration (100% for maximum observability)
@@ -63,6 +92,25 @@ export ELASTIC_APM_INSTRUMENT="${ELASTIC_APM_INSTRUMENT:-true}"
 
 # .NET-specific configuration  
 export ELASTIC_APM_SERVER_URLS="${ELASTIC_APM_SERVER_URL}"
+
+# Helper functions for service management
+validate_service() {
+    local service="$1"
+    for s in $AVAILABLE_SERVICES; do
+        if [[ "$s" == "$service" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+list_available_services() {
+    echo "Available services:"
+    for service in $AVAILABLE_SERVICES; do
+        local container=$(get_container_name "$service")
+        echo "  • $service ($container)"
+    done
+}
 
 print_apm_config() {
     echo ""
@@ -129,10 +177,26 @@ print_header() {
     echo ""
 }
 
-# Check service status
+# Check service status (all or specific)
 check_status() {
+    local services=("$@")
+    
     print_header
-    echo "🔍 Service Status Check:"
+    if [ ${#services[@]} -eq 0 ]; then
+        echo "🔍 Service Status Check (All Services):"
+    else
+        echo "🔍 Service Status Check (${services[*]}):"
+        
+        # Validate all services first
+        for service in "${services[@]}"; do
+            if ! validate_service "$service"; then
+                print_error "Unknown service: $service"
+                echo ""
+                list_available_services
+                exit 1
+            fi
+        done
+    fi
     echo ""
     
     # Check Docker services
@@ -141,73 +205,109 @@ check_status() {
         return 1
     fi
     
+    # Function to check if service should be displayed
+    should_check_service() {
+        local service="$1"
+        if [ ${#services[@]} -eq 0 ]; then
+            return 0  # Check all services
+        fi
+        for s in "${services[@]}"; do
+            if [[ "$s" == "$service" ]]; then
+                return 0
+            fi
+        done
+        return 1
+    }
+    
     # Check Kong API Gateway first
-    if docker compose --profile kong ps | grep -q "vubank-kong-gateway.*Up"; then
-        print_success "✅ Kong API Gateway (8086) - Running"
-    else
-        print_error "❌ Kong API Gateway (8086) - Not Running"
+    if should_check_service "kong"; then
+        if docker compose --profile kong ps | grep -q "vubank-kong-gateway.*Up"; then
+            print_success "✅ Kong API Gateway (8086) - Running"
+        else
+            print_error "❌ Kong API Gateway (8086) - Not Running"
+        fi
     fi
     
-    if docker compose --profile kong ps | grep -q "kong-postgres.*Up"; then
-        print_success "✅ Kong Database (internal) - Running"
-    else
-        print_error "❌ Kong Database (internal) - Not Running"
+    if should_check_service "kong-db"; then
+        if docker compose --profile kong ps | grep -q "kong-postgres.*Up"; then
+            print_success "✅ Kong Database (internal) - Running"
+        else
+            print_error "❌ Kong Database (internal) - Not Running"
+        fi
     fi
     
     # Check individual services (internal ports only)
-    if docker compose ps | grep -q "login-go-service.*Up"; then
-        print_success "✅ Go Login Gateway (internal:8000) - Running"
-    else
-        print_error "❌ Go Login Gateway (internal:8000) - Not Running"
+    if should_check_service "login-go"; then
+        if docker compose ps | grep -q "login-go-service.*Up"; then
+            print_success "✅ Go Login Gateway (internal:8000) - Running"
+        else
+            print_error "❌ Go Login Gateway (internal:8000) - Not Running"
+        fi
     fi
     
-    if docker compose ps | grep -q "login-python-authenticator.*Up"; then
-        print_success "✅ Python Auth Service (internal:8001) - Running"
-    else
-        print_error "❌ Python Auth Service (internal:8001) - Not Running"
+    if should_check_service "login-python"; then
+        if docker compose ps | grep -q "login-python-authenticator.*Up"; then
+            print_success "✅ Python Auth Service (internal:8001) - Running"
+        else
+            print_error "❌ Python Auth Service (internal:8001) - Not Running"
+        fi
     fi
     
-    if docker compose ps | grep -q "accounts-go-service.*Up"; then
-        print_success "✅ Go Accounts Service (internal:8002) - Running"
-    else
-        print_error "❌ Go Accounts Service (internal:8002) - Not Running"
+    if should_check_service "accounts"; then
+        if docker compose ps | grep -q "accounts-go-service.*Up"; then
+            print_success "✅ Go Accounts Service (internal:8002) - Running"
+        else
+            print_error "❌ Go Accounts Service (internal:8002) - Not Running"
+        fi
     fi
     
-    if docker compose ps | grep -q "pdf-receipt-java-service.*Up"; then
-        print_success "✅ Java PDF Receipt Service (internal:8003) - Running"
-    else
-        print_error "❌ Java PDF Receipt Service (internal:8003) - Not Running"
+    if should_check_service "pdf"; then
+        if docker compose ps | grep -q "pdf-receipt-java-service.*Up"; then
+            print_success "✅ Java PDF Receipt Service (internal:8003) - Running"
+        else
+            print_error "❌ Java PDF Receipt Service (internal:8003) - Not Running"
+        fi
     fi
     
-    if docker compose ps | grep -q "corebanking-java-service.*Up"; then
-        print_success "✅ Java CoreBanking Service (internal:8005) - Running"
-    else
-        print_error "❌ Java CoreBanking Service (internal:8005) - Not Running"
+    if should_check_service "corebanking"; then
+        if docker compose ps | grep -q "corebanking-java-service.*Up"; then
+            print_success "✅ Java CoreBanking Service (internal:8005) - Running"
+        else
+            print_error "❌ Java CoreBanking Service (internal:8005) - Not Running"
+        fi
     fi
 
-    if docker compose ps | grep -q "payment-process-java-service.*Up"; then
-        print_success "✅ Java Payment Service (internal:8004) - Running"
-    else
-        print_error "❌ Java Payment Service (internal:8004) - Not Running"
+    if should_check_service "payment"; then
+        if docker compose ps | grep -q "payment-process-java-service.*Up"; then
+            print_success "✅ Java Payment Service (internal:8004) - Running"
+        else
+            print_error "❌ Java Payment Service (internal:8004) - Not Running"
+        fi
     fi
 
-    if docker compose ps | grep -q "payee-store-dotnet-service.*Up"; then
-        print_success "✅ .NET Payee Service (internal:5004) - Running"
-    else
-        print_error "❌ .NET Payee Service (internal:5004) - Not Running"
+    if should_check_service "payee"; then
+        if docker compose ps | grep -q "payee-store-dotnet-service.*Up"; then
+            print_success "✅ .NET Payee Service (internal:5004) - Running"
+        else
+            print_error "❌ .NET Payee Service (internal:5004) - Not Running"
+        fi
     fi
     
-    if docker compose ps | grep -q "vubank-postgres.*Up"; then
-        print_success "✅ PostgreSQL Database (5432) - Running"
-    else
-        print_error "❌ PostgreSQL Database (5432) - Not Running"
+    if should_check_service "postgres"; then
+        if docker compose ps | grep -q "vubank-postgres.*Up"; then
+            print_success "✅ PostgreSQL Database (5432) - Running"
+        else
+            print_error "❌ PostgreSQL Database (5432) - Not Running"
+        fi
     fi
 
     # Check HTML Frontend Container
-    if docker compose --profile html-frontend ps | grep -q "vubank-html-frontend.*Up"; then
-        print_success "✅ HTML Frontend (internal:80) - Running"
-    else
-        print_error "❌ HTML Frontend (internal:80) - Not Running"
+    if should_check_service "frontend"; then
+        if docker compose --profile html-frontend ps | grep -q "vubank-html-frontend.*Up"; then
+            print_success "✅ HTML Frontend (internal:80) - Running"
+        else
+            print_error "❌ HTML Frontend (internal:80) - Not Running"
+        fi
     fi
     
     echo ""
@@ -235,49 +335,149 @@ check_status() {
     echo ""
 }
 
-# Start all services
+# Start services (all or specific)
 start_services() {
+    local services=("${@:1}")  # Get all arguments as services
+    
     print_header
-    print_status "Starting all services..."
+    if [ ${#services[@]} -eq 0 ]; then
+        print_status "Starting all services..."
+    else
+        print_status "Starting specific services: ${services[*]}..."
+        # Validate all services first
+        for service in "${services[@]}"; do
+            if ! validate_service "$service"; then
+                print_error "Unknown service: $service"
+                echo ""
+                list_available_services
+                exit 1
+            fi
+        done
+    fi
     echo ""
     
-    # Start with HTML frontend container
-    start_services_with_html_container
+    # Start services
+    start_services_with_container "${services[@]}"
 }
 
-# Start services with HTML container
-start_services_with_html_container() {
-    print_status "Starting services with Kong API Gateway and HTML frontend container..."
+# Start services with container support
+start_services_with_container() {
+    local services=("$@")
+    local compose_cmd
     
-    # Build HTML container with fresh build (no cache)
-    print_status "Building HTML frontend container (fresh build, no cache)..."
-    cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
-    
-    # Start Kong database and migration first
-    print_status "Starting Kong database and running migrations..."
-    docker compose --profile kong up kong-postgres kong-migrations -d --build
-    
-    # Wait for Kong database to be ready
-    print_status "Waiting for Kong database to be ready..."
-    sleep 10
-    
-    # Start all services with Kong and HTML frontend profiles (fresh build)
-    print_status "Starting all services with Kong API Gateway (fresh build, no cache)..."
-    docker compose --profile kong --profile html-frontend up -d --build
-    
-    # Wait for Kong to be ready and configure it automatically
-    print_status "Waiting for Kong API Gateway to be ready..."
-    sleep 15
-    
-    # Auto-configure Kong services and routes
-    print_status "Configuring Kong Gateway services and routes..."
-    if [ -f "kong/configure-kong-auto.sh" ]; then
-        ./kong/configure-kong-auto.sh
+    if [ ${#services[@]} -eq 0 ]; then
+        # Start all services
+        print_status "Starting all services with Kong API Gateway and HTML frontend container..."
+        
+        # Build HTML container with fresh build (no cache)
+        print_status "Building HTML frontend container (fresh build, no cache)..."
+        cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
+        
+        # Start Kong database and migration first
+        print_status "Starting Kong database and running migrations..."
+        docker compose --profile kong up kong-postgres kong-migrations -d --build
+        
+        # Wait for Kong database to be ready
+        print_status "Waiting for Kong database to be ready..."
+        sleep 10
+        
+        # Start all services with Kong and HTML frontend profiles (fresh build)
+        print_status "Starting all services with Kong API Gateway (fresh build, no cache)..."
+        docker compose --profile kong --profile html-frontend up -d --build
+        
+        # Wait for Kong to be ready and configure it automatically
+        print_status "Waiting for Kong API Gateway to be ready..."
+        sleep 15
+        
+        # Auto-configure Kong services and routes
+        print_status "Configuring Kong Gateway services and routes..."
+        if [ -f "kong/configure-kong-auto.sh" ]; then
+            ./kong/configure-kong-auto.sh
+        else
+            print_error "Kong configuration script not found!"
+        fi
+        
+        print_success "All services started with Kong API Gateway (port 8086) and HTML frontend!"
     else
-        print_error "Kong configuration script not found!"
+        # Start specific services
+        local need_kong=false
+        local need_frontend=false
+        local need_kong_deps=false
+        
+        # Check if we need Kong or frontend
+        for service in "${services[@]}"; do
+            if [[ "$service" == "kong" ]]; then
+                need_kong=true
+                need_kong_deps=true
+            elif [[ "$service" == "frontend" ]]; then
+                need_frontend=true
+            elif [[ "$service" != "kong-db" && "$service" != "kong-migrations" && "$service" != "postgres" ]]; then
+                # Most services need Kong to be accessible
+                need_kong_deps=true
+            fi
+        done
+        
+        # Start Kong dependencies if needed
+        if [[ "$need_kong_deps" == "true" ]]; then
+            print_status "Starting Kong dependencies (database and migrations)..."
+            docker compose --profile kong up kong-postgres kong-migrations -d --build
+            sleep 10
+        fi
+        
+        # Build frontend if needed
+        if [[ "$need_frontend" == "true" ]]; then
+            print_status "Building HTML frontend container..."
+            cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
+        fi
+        
+        # Build compose command for specific services
+        local profiles=""
+        local container_names=""
+        
+        # Collect unique profiles
+        for service in "${services[@]}"; do
+            local profile=$(get_service_profile "$service")
+            if [[ -n "$profile" ]] && [[ ! "$profiles" =~ "$profile" ]]; then
+                if [[ -n "$profiles" ]]; then
+                    profiles="$profiles $profile"
+                else
+                    profiles="$profile"
+                fi
+            fi
+        done
+        
+        # Collect container names
+        for service in "${services[@]}"; do
+            local container=$(get_container_name "$service")
+            if [[ -n "$container_names" ]]; then
+                container_names="$container_names $container"
+            else
+                container_names="$container"
+            fi
+        done
+        
+        print_status "Starting services: ${services[*]}..."
+        if [[ -n "$profiles" ]]; then
+            docker compose $profiles up -d --build $container_names
+        else
+            docker compose up -d --build $container_names
+        fi
+        
+        # Configure Kong if it was started
+        if [[ "$need_kong" == "true" ]]; then
+            print_status "Waiting for Kong API Gateway to be ready..."
+            sleep 15
+            print_status "Configuring Kong Gateway services and routes..."
+            if [ -f "kong/configure-kong-auto.sh" ]; then
+                ./kong/configure-kong-auto.sh
+            else
+                print_error "Kong configuration script not found!"
+            fi
+        fi
+        
+        print_success "Services started: ${services[*]}!"
     fi
     
-    print_success "All services started with Kong API Gateway (port 8086) and HTML frontend!"
     echo ""
     print_status "🔗 Access your application at: http://localhost:8086"
     print_apm_config
@@ -285,28 +485,86 @@ start_services_with_html_container() {
 }
 
 # Start services with React container  
-# Stop all services
+# Stop services (all or specific)
 stop_services() {
+    local services=("$@")
+    
     print_header
-    print_status "Stopping all services..."
-    echo ""
-    
-    # Stop Docker services (including Kong and HTML frontend containers)
-    print_status "Stopping Docker services with Kong API Gateway..."
-    docker compose --profile kong --profile html-frontend --profile frontend down --remove-orphans
-    
-    print_success "All services stopped!"
+    if [ ${#services[@]} -eq 0 ]; then
+        print_status "Stopping all services..."
+        echo ""
+        
+        # Stop Docker services (including Kong and HTML frontend containers)
+        print_status "Stopping Docker services with Kong API Gateway..."
+        docker compose --profile kong --profile html-frontend --profile frontend down --remove-orphans
+        
+        print_success "All services stopped!"
+    else
+        print_status "Stopping specific services: ${services[*]}..."
+        echo ""
+        
+        # Validate all services first
+        for service in "${services[@]}"; do
+            if ! validate_service "$service"; then
+                print_error "Unknown service: $service"
+                echo ""
+                list_available_services
+                exit 1
+            fi
+        done
+        
+        # Stop specific services
+        local profiles=""
+        local container_names=""
+        
+        # Collect unique profiles
+        for service in "${services[@]}"; do
+            local profile=$(get_service_profile "$service")
+            if [[ -n "$profile" ]] && [[ ! "$profiles" =~ "$profile" ]]; then
+                if [[ -n "$profiles" ]]; then
+                    profiles="$profiles $profile"
+                else
+                    profiles="$profile"
+                fi
+            fi
+        done
+        
+        # Collect container names
+        for service in "${services[@]}"; do
+            local container=$(get_container_name "$service")
+            if [[ -n "$container_names" ]]; then
+                container_names="$container_names $container"
+            else
+                container_names="$container"
+            fi
+        done
+        
+        print_status "Stopping services..."
+        if [[ -n "$profiles" ]]; then
+            docker compose $profiles stop $container_names
+        else
+            docker compose stop $container_names
+        fi
+        
+        print_success "Services stopped: ${services[*]}!"
+    fi
 }
 
-# Restart all services
+# Restart services (all or specific)
 restart_services() {
+    local services=("$@")
+    
     print_header
-    print_status "Restarting all services..."
+    if [ ${#services[@]} -eq 0 ]; then
+        print_status "Restarting all services..."
+    else
+        print_status "Restarting specific services: ${services[*]}..."
+    fi
     echo ""
     
-    stop_services
+    stop_services "${services[@]}"
     sleep 5
-    start_services "$1" "$2"
+    start_services "${services[@]}"
 }
 
 # Install dependencies
@@ -334,16 +592,41 @@ install_dependencies() {
     print_success "Dependencies installed!"
 }
 
-# Show logs
+# Show logs (all or specific services)
 show_logs() {
+    local services=("$@")
+    
     print_header
-    echo "📋 Service Logs:"
-    echo ""
-    echo "Docker Services:"
-    docker compose logs --tail=50
-    echo ""
-    echo "Frontend Server:"
-    ./frontend-server.sh logs
+    if [ ${#services[@]} -eq 0 ]; then
+        echo "📋 Service Logs (All Services):"
+        echo ""
+        echo "Docker Services:"
+        docker compose logs --tail=50
+        echo ""
+        echo "Frontend Server:"
+        ./frontend-server.sh logs
+    else
+        echo "📋 Service Logs (${services[*]}):"
+        echo ""
+        
+        # Validate all services first
+        for service in "${services[@]}"; do
+            if ! validate_service "$service"; then
+                print_error "Unknown service: $service"
+                echo ""
+                list_available_services
+                exit 1
+            fi
+        done
+        
+        # Show logs for specific services
+        for service in "${services[@]}"; do
+            local container=$(get_container_name "$service")
+            echo "--- Logs for $service ($container) ---"
+            docker compose logs --tail=50 "$container"
+            echo ""
+        done
+    fi
 }
 
 # Health check
@@ -552,6 +835,84 @@ uninstall_services() {
     echo ""
 }
 
+# Build services (all or specific)
+build_services() {
+    local services=("$@")
+    
+    print_header
+    if [ ${#services[@]} -eq 0 ]; then
+        print_status "Building all services..."
+        echo ""
+        
+        # Build HTML frontend container
+        print_status "Building HTML frontend container..."
+        cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
+        
+        # Build all services
+        print_status "Building all Docker services..."
+        docker compose --profile kong --profile html-frontend build --no-cache
+        
+        print_success "All services built successfully!"
+    else
+        print_status "Building specific services: ${services[*]}..."
+        echo ""
+        
+        # Validate all services first
+        for service in "${services[@]}"; do
+            if ! validate_service "$service"; then
+                print_error "Unknown service: $service"
+                echo ""
+                list_available_services
+                exit 1
+            fi
+        done
+        
+        # Build frontend if needed
+        for service in "${services[@]}"; do
+            if [[ "$service" == "frontend" ]]; then
+                print_status "Building HTML frontend container..."
+                cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
+                break
+            fi
+        done
+        
+        # Build specific services
+        local profiles=""
+        local container_names=""
+        
+        # Collect unique profiles
+        for service in "${services[@]}"; do
+            local profile=$(get_service_profile "$service")
+            if [[ -n "$profile" ]] && [[ ! "$profiles" =~ "$profile" ]]; then
+                if [[ -n "$profiles" ]]; then
+                    profiles="$profiles $profile"
+                else
+                    profiles="$profile"
+                fi
+            fi
+        done
+        
+        # Collect container names
+        for service in "${services[@]}"; do
+            local container=$(get_container_name "$service")
+            if [[ -n "$container_names" ]]; then
+                container_names="$container_names $container"
+            else
+                container_names="$container"
+            fi
+        done
+        
+        print_status "Building services..."
+        if [[ -n "$profiles" ]]; then
+            docker compose $profiles build --no-cache $container_names
+        else
+            docker compose build --no-cache $container_names
+        fi
+        
+        print_success "Services built: ${services[*]}!"
+    fi
+}
+
 # Clean Docker build cache and force fresh builds
 clean_cache() {
     print_header
@@ -621,26 +982,36 @@ show_help() {
     print_header
     echo "VuNG Bank Service Management Script"
     echo ""
-    echo "Usage: ./manage-services.sh [command]"
+    echo "Usage: ./manage-services.sh [command] [service1] [service2] ..."
     echo ""
     echo "Commands:"
-    echo "  status    - Check status of all services"
-    echo "  start     - Start all services with HTML frontend container"
-    echo "  stop      - Stop all services"
-    echo "  restart   - Restart all services"
-    echo "  install   - Install dependencies and setup"
-    echo "  uninstall - Complete removal: services, containers, images (including Kong/Postgres), volumes"
-    echo "  clean-cache - Clean Docker build cache and force fresh builds"
-    echo "  apm-config - Show centralized APM configuration for all services"
-    echo "  logs      - Show service logs"
-    echo "  health    - Run health checks"
-    echo "  help      - Show this help message"
+    echo "  status [services]   - Check status of all or specific services"
+    echo "  start [services]    - Start all or specific services"
+    echo "  stop [services]     - Stop all or specific services"
+    echo "  restart [services]  - Restart all or specific services"
+    echo "  build [services]    - Build all or specific services"
+    echo "  logs [services]     - Show logs for all or specific services"
+    echo "  install             - Install dependencies and setup"
+    echo "  uninstall           - Complete removal: services, containers, images (including Kong/Postgres), volumes"
+    echo "  clean-cache         - Clean Docker build cache and force fresh builds"
+    echo "  apm-config          - Show centralized APM configuration for all services"
+    echo "  health              - Run health checks"
+    echo "  help                - Show this help message"
+    echo ""
+    echo "Available Services:"
+    for service in $AVAILABLE_SERVICES; do
+        local container=$(get_container_name "$service")
+        printf "  %-15s - %s\n" "$service" "$container"
+    done
     echo ""
     echo "Examples:"
     echo "  ./manage-services.sh start                    # Start all services"
-    echo "  ./manage-services.sh status                   # Check service status"
-    echo "  ./manage-services.sh apm-config               # Show centralized APM configuration"
-    echo "  ./manage-services.sh restart                  # Restart all services"
+    echo "  ./manage-services.sh start kong postgres      # Start only Kong and PostgreSQL"
+    echo "  ./manage-services.sh stop login-python        # Stop only Python authenticator"
+    echo "  ./manage-services.sh restart accounts payee   # Restart accounts and payee services"
+    echo "  ./manage-services.sh build login-go payment   # Build only Go login and payment services"
+    echo "  ./manage-services.sh logs kong                # Show logs for Kong only"
+    echo "  ./manage-services.sh status                   # Check all services status"
     echo "  ./manage-services.sh uninstall                # Remove everything (including Kong/Postgres base images)"
     echo "  ./manage-services.sh clean-cache              # Clean Docker cache for fresh builds"
     echo ""
@@ -662,16 +1033,19 @@ show_help() {
 # Main script logic
 case "${1:-help}" in
     "status")
-        check_status
+        check_status "${@:2}"
         ;;
     "start")
-        start_services
+        start_services "${@:2}"
         ;;
     "stop")
-        stop_services
+        stop_services "${@:2}"
         ;;
     "restart")
-        restart_services "$1" "$2"
+        restart_services "${@:2}"
+        ;;
+    "build")
+        build_services "${@:2}"
         ;;
     "install")
         install_dependencies
@@ -686,7 +1060,7 @@ case "${1:-help}" in
         show_apm_config
         ;;
     "logs")
-        show_logs
+        show_logs "${@:2}"
         ;;
     "health")
         health_check

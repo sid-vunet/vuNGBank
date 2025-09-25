@@ -159,6 +159,20 @@
             // Enable active monitoring
             active: true
         });
+        
+        // Debug RUM status
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (typeof window.elasticApm !== 'undefined') {
+                    console.log('✅ Elastic RUM is loaded and active');
+                    console.log('📊 RUM Service Name:', window.elasticApm._config?.serviceName);
+                    console.log('🔗 RUM Server URL:', window.elasticApm._config?.serverUrl);
+                    console.log('👆 User Interactions Enabled:', window.elasticApm._config?.captureUserInteractions);
+                } else {
+                    console.error('❌ Elastic RUM is not loaded!');
+                }
+            }, 1000);
+        });
     </script>
     
     <style>

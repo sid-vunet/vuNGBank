@@ -164,6 +164,52 @@ namespace PayeeService.Controllers
             }
         }
 
+        /// <summary>
+        /// Health check endpoint - accessible without authentication
+        /// </summary>
+        [HttpGet("health")]
+        [AllowAnonymous]
+        public IActionResult GetPayeesHealth()
+        {
+            try
+            {
+                var healthData = new
+                {
+                    status = "healthy",
+                    service = "vubank-payee-service", 
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    version = "1.0.0",
+                    environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+                    uptime = GetUptime(),
+                    endpoint = "payees"
+                };
+
+                _logger.LogDebug("Payees health check completed successfully");
+                return Ok(healthData);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Payees health check failed");
+                
+                var unhealthyData = new
+                {
+                    status = "unhealthy",
+                    service = "vubank-payee-service",
+                    timestamp = DateTime.UtcNow.ToString("O"),
+                    error = ex.Message,
+                    endpoint = "payees"
+                };
+
+                return StatusCode(503, unhealthyData);
+            }
+        }
+
+        private static string GetUptime()
+        {
+            var uptime = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
+            return $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+        }
+
         private string? GetUserId()
         {
             return User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
