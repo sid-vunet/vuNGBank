@@ -16,10 +16,36 @@ NC='\033[0m' # No Color
 # Configuration
 PROJECT_DIR="/Users/sidharthan/Documents/vuNGBank"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
-FRONTEND_PORT=3001
-BACKEND_API_PORT=8000
+KONG_GATEWAY_PORT=8086
+KONG_ADMIN_PORT=8001
+BACKEND_API_PORT=8000  # Now internal only
 
-# Print colored output
+#     echo "Services managed:"
+    echo "  🌐 Kong API Gateway (port 8086) - MAIN ENTRY POINT"
+    echo "  🔧 Kong Admin API (port 8001)"
+    echo "  🎛️  Kong Admin GUI (port 8002)"
+    echo "  🗄️  PostgreSQL Database (port 5432)"
+    echo "  🗄️  Kong PostgreSQL Database (internal)"
+    echo ""
+    echo "Backend Services (internal access only via Kong):"
+    echo "  • Go Login Gateway (internal:8000)"
+    echo "  • Python Auth Service (internal:8001)"
+    echo "  • Go Accounts Service (internal:8002)"
+    echo "  • Java PDF Receipt Service (internal:8003)"
+    echo "  • Java Payment Service (internal:8004)"
+    echo "  • Java CoreBanking Service (internal:8005)"
+    echo "  • .NET Payee Service (internal:5004)"
+    echo "  • HTML Frontend Container (internal:80)"
+    echo ""
+    echo "Enterprise Features:"
+    echo "  ✅ Comprehensive APM monitoring with Elastic APM"
+    echo "  ✅ Distributed tracing with correlation IDs"
+    echo "  ✅ Request/Response logging with body capture"
+    echo "  ✅ Rate limiting and security policies"
+    echo "  ✅ CORS and security headers"
+    echo "  ✅ Prometheus metrics collection"
+    echo "  ✅ JWT authentication support"
+    echo "" output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -40,6 +66,7 @@ print_header() {
     echo ""
     echo "=========================================="
     echo "        VuNG Bank Service Manager"
+    echo "        With Kong API Gateway (8086)"
     echo "=========================================="
     echo ""
 }
@@ -56,47 +83,60 @@ check_status() {
         return 1
     fi
     
-    # Check individual services
-    if docker compose ps | grep -q "login-go-service.*Up"; then
-        print_success "✅ Go Login Gateway (8000) - Running"
+    # Check Kong API Gateway first
+    if docker compose --profile kong ps | grep -q "vubank-kong-gateway.*Up"; then
+        print_success "✅ Kong API Gateway (8086) - Running"
     else
-        print_error "❌ Go Login Gateway (8000) - Not Running"
+        print_error "❌ Kong API Gateway (8086) - Not Running"
+    fi
+    
+    if docker compose --profile kong ps | grep -q "kong-postgres.*Up"; then
+        print_success "✅ Kong Database (internal) - Running"
+    else
+        print_error "❌ Kong Database (internal) - Not Running"
+    fi
+    
+    # Check individual services (internal ports only)
+    if docker compose ps | grep -q "login-go-service.*Up"; then
+        print_success "✅ Go Login Gateway (internal:8000) - Running"
+    else
+        print_error "❌ Go Login Gateway (internal:8000) - Not Running"
     fi
     
     if docker compose ps | grep -q "login-python-authenticator.*Up"; then
-        print_success "✅ Python Auth Service (8001) - Running"
+        print_success "✅ Python Auth Service (internal:8001) - Running"
     else
-        print_error "❌ Python Auth Service (8001) - Not Running"
+        print_error "❌ Python Auth Service (internal:8001) - Not Running"
     fi
     
     if docker compose ps | grep -q "accounts-go-service.*Up"; then
-        print_success "✅ Go Accounts Service (8002) - Running"
+        print_success "✅ Go Accounts Service (internal:8002) - Running"
     else
-        print_error "❌ Go Accounts Service (8002) - Not Running"
+        print_error "❌ Go Accounts Service (internal:8002) - Not Running"
     fi
     
     if docker compose ps | grep -q "pdf-receipt-java-service.*Up"; then
-        print_success "✅ Java PDF Receipt Service (8003) - Running"
+        print_success "✅ Java PDF Receipt Service (internal:8003) - Running"
     else
-        print_error "❌ Java PDF Receipt Service (8003) - Not Running"
+        print_error "❌ Java PDF Receipt Service (internal:8003) - Not Running"
     fi
     
     if docker compose ps | grep -q "corebanking-java-service.*Up"; then
-        print_success "✅ Java CoreBanking Service (8005) - Running"
+        print_success "✅ Java CoreBanking Service (internal:8005) - Running"
     else
-        print_error "❌ Java CoreBanking Service (8005) - Not Running"
+        print_error "❌ Java CoreBanking Service (internal:8005) - Not Running"
     fi
 
     if docker compose ps | grep -q "payment-process-java-service.*Up"; then
-        print_success "✅ Java Payment Service (8004) - Running"
+        print_success "✅ Java Payment Service (internal:8004) - Running"
     else
-        print_error "❌ Java Payment Service (8004) - Not Running"
+        print_error "❌ Java Payment Service (internal:8004) - Not Running"
     fi
 
     if docker compose ps | grep -q "payee-store-dotnet-service.*Up"; then
-        print_success "✅ .NET Payee Service (5004) - Running"
+        print_success "✅ .NET Payee Service (internal:5004) - Running"
     else
-        print_error "❌ .NET Payee Service (5004) - Not Running"
+        print_error "❌ .NET Payee Service (internal:5004) - Not Running"
     fi
     
     if docker compose ps | grep -q "vubank-postgres.*Up"; then
@@ -106,23 +146,34 @@ check_status() {
     fi
 
     # Check HTML Frontend Container
-    if docker compose ps | grep -q "vubank-html-frontend.*Up"; then
-        print_success "✅ HTML Frontend (3001) - Running"
+    if docker compose --profile html-frontend ps | grep -q "vubank-html-frontend.*Up"; then
+        print_success "✅ HTML Frontend (internal:80) - Running"
     else
-        print_error "❌ HTML Frontend (3001) - Not Running"
+        print_error "❌ HTML Frontend (internal:80) - Not Running"
     fi
     
     echo ""
-    echo "🔗 Service URLs:"
-    echo "   HTML Frontend:    http://localhost:3001"
-    echo "   Login API:        http://localhost:8000"
-    echo "   Auth Service:     http://localhost:8001"
-    echo "   Accounts API:     http://localhost:8002"
-    echo "   PDF Service:      http://localhost:8003"
-    echo "   Payment Service:  http://localhost:8004 (with health: /payments/health)"
-    echo "   Payee Service:    http://localhost:5004 (with health: /api/health)"
-    echo "   CoreBanking:      http://localhost:8005"
-    echo "   Database:         localhost:5432"
+    echo "🔗 Service URLs (All traffic through Kong Gateway):"
+    echo "   🌐 MAIN ENTRY POINT: http://localhost:8086"
+    echo ""
+    echo "   Frontend Pages:"
+    echo "     • Login:          http://localhost:8086/login.html"
+    echo "     • Dashboard:      http://localhost:8086/dashboard.html"
+    echo "     • Fund Transfer:  http://localhost:8086/FundTransfer.html"
+    echo ""
+    echo "   API Endpoints:"
+    echo "     • Login API:      http://localhost:8086/api/login"
+    echo "     • Session API:    http://localhost:8086/api/session"
+    echo "     • Accounts API:   http://localhost:8086/accounts"
+    echo "     • Payments API:   http://localhost:8086/payments"
+    echo "     • PDF API:        http://localhost:8086/api/pdf"
+    echo "     • Payees API:     http://localhost:8086/api/payees"
+    echo "     • CoreBanking:    http://localhost:8086/core"
+    echo ""
+    echo "   Management:"
+    echo "     • Kong Admin API: http://localhost:8001"
+    echo "     • Kong Admin GUI: http://localhost:8002"
+    echo "     • Database:       localhost:5432"
     echo ""
 }
 
@@ -138,17 +189,40 @@ start_services() {
 
 # Start services with HTML container
 start_services_with_html_container() {
-    print_status "Starting services with HTML frontend container..."
+    print_status "Starting services with Kong API Gateway and HTML frontend container..."
     
-    # Build HTML container if needed
-    print_status "Building HTML frontend container..."
+    # Build HTML container with fresh build (no cache)
+    print_status "Building HTML frontend container (fresh build, no cache)..."
     cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
     
-    # Start Docker services with HTML frontend profile
-    print_status "Starting Docker services with HTML frontend..."
-    docker compose --profile html-frontend up -d
+    # Start Kong database and migration first
+    print_status "Starting Kong database and running migrations..."
+    docker compose --profile kong up kong-postgres kong-migrations -d --build
     
-    print_success "All services started with HTML frontend container!"
+    # Wait for Kong database to be ready
+    print_status "Waiting for Kong database to be ready..."
+    sleep 10
+    
+    # Start all services with Kong and HTML frontend profiles (fresh build)
+    print_status "Starting all services with Kong API Gateway (fresh build, no cache)..."
+    docker compose --profile kong --profile html-frontend up -d --build
+    
+    # Wait for Kong to be ready and configure it automatically
+    print_status "Waiting for Kong API Gateway to be ready..."
+    sleep 15
+    
+    # Auto-configure Kong services and routes
+    print_status "Configuring Kong Gateway services and routes..."
+    if [ -f "kong/configure-kong-auto.sh" ]; then
+        ./kong/configure-kong-auto.sh
+    else
+        print_error "Kong configuration script not found!"
+    fi
+    
+    print_success "All services started with Kong API Gateway (port 8086) and HTML frontend!"
+    echo ""
+    print_status "🔗 Access your application at: http://localhost:8086"
+    echo ""
     check_status
 }
 
@@ -159,9 +233,9 @@ stop_services() {
     print_status "Stopping all services..."
     echo ""
     
-    # Stop Docker services (including HTML frontend container)
-    print_status "Stopping Docker services..."
-    docker compose --profile html-frontend down
+    # Stop Docker services (including Kong and HTML frontend containers)
+    print_status "Stopping Docker services with Kong API Gateway..."
+    docker compose --profile kong --profile html-frontend --profile frontend down --remove-orphans
     
     print_success "All services stopped!"
 }
@@ -225,68 +299,70 @@ health_check() {
     docker compose ps
     
     echo ""
-    print_status "Checking service endpoints..."
+    print_status "Checking service endpoints through Kong API Gateway..."
     
-    # Test endpoints
-    if curl -s "http://localhost:8000/api/health" >/dev/null 2>&1; then
-        print_success "✅ Login Gateway health check passed"
+    # Test Kong API Gateway health
+    if curl -s "http://localhost:8086" >/dev/null 2>&1; then
+        print_success "✅ Kong API Gateway health check passed"
     else
-        print_error "❌ Login Gateway health check failed"
+        print_error "❌ Kong API Gateway health check failed"
     fi
     
-    if curl -s "http://localhost:8001/health" >/dev/null 2>&1; then
-        print_success "✅ Auth Service health check passed"
+    # Test Kong Admin API
+    if curl -s "http://localhost:8001" >/dev/null 2>&1; then
+        print_success "✅ Kong Admin API health check passed"
     else
-        print_error "❌ Auth Service health check failed"
+        print_error "❌ Kong Admin API health check failed"
     fi
     
-    if curl -s "http://localhost:8002/health" >/dev/null 2>&1; then
-        print_success "✅ Accounts Service health check passed"
+    # Test endpoints through Kong Gateway (port 8086)
+    if curl -s "http://localhost:8086/api/health" >/dev/null 2>&1; then
+        print_success "✅ Login Gateway (via Kong) health check passed"
     else
-        print_error "❌ Accounts Service health check failed"
+        print_error "❌ Login Gateway (via Kong) health check failed"
     fi
     
-    if curl -s "http://localhost:8003/api/pdf/health" >/dev/null 2>&1; then
-        print_success "✅ PDF Receipt Service health check passed"
+    if curl -s "http://localhost:8086/health" >/dev/null 2>&1; then
+        print_success "✅ Auth Service (via Kong) health check passed"
     else
-        print_error "❌ PDF Receipt Service health check failed"
+        print_error "❌ Auth Service (via Kong) health check failed"
     fi
     
-    if curl -s "http://localhost:8005/core/health" >/dev/null 2>&1; then
-        print_success "✅ CoreBanking Service health check passed"
+    if curl -s "http://localhost:8086/accounts" >/dev/null 2>&1; then
+        print_success "✅ Accounts Service (via Kong) health check passed"
     else
-        print_error "❌ CoreBanking Service health check failed"
+        print_error "❌ Accounts Service (via Kong) health check failed"
+    fi
+    
+    if curl -s "http://localhost:8086/api/pdf/health" >/dev/null 2>&1; then
+        print_success "✅ PDF Receipt Service (via Kong) health check passed"
+    else
+        print_error "❌ PDF Receipt Service (via Kong) health check failed"
+    fi
+    
+    if curl -s "http://localhost:8086/core/health" >/dev/null 2>&1; then
+        print_success "✅ CoreBanking Service (via Kong) health check passed"
+    else
+        print_error "❌ CoreBanking Service (via Kong) health check failed"
     fi
 
-    if curl -s "http://localhost:8004/payments/health" >/dev/null 2>&1; then
-        print_success "✅ Payment Service health check passed"
+    if curl -s "http://localhost:8086/payments/health" >/dev/null 2>&1; then
+        print_success "✅ Payment Service (via Kong) health check passed"
     else
-        print_error "❌ Payment Service health check failed"
+        print_error "❌ Payment Service (via Kong) health check failed"
     fi
 
-    if curl -s "http://localhost:5004/api/health" >/dev/null 2>&1; then
-        print_success "✅ Payee Service health check passed"
+    if curl -s "http://localhost:8086/api/payees" >/dev/null 2>&1; then
+        print_success "✅ Payee Service (via Kong) health check passed"
     else
-        print_error "❌ Payee Service health check failed"
+        print_error "❌ Payee Service (via Kong) health check failed"
     fi
 
-    # Frontend health checks
-    if curl -s "http://localhost:3000/health" >/dev/null 2>&1; then
-        print_success "✅ React Frontend health check passed"
+    # Frontend health checks through Kong
+    if curl -s "http://localhost:8086/login.html" >/dev/null 2>&1; then
+        print_success "✅ HTML Frontend (via Kong) health check passed"
     else
-        print_error "❌ React Frontend health check failed (not running)"
-    fi
-    
-    if curl -s "http://localhost:3001/health" >/dev/null 2>&1; then
-        print_success "✅ HTML Frontend health check passed"
-    else
-        print_error "❌ HTML Frontend health check failed (not running)"
-    fi
-
-    if curl -s "http://localhost:3001" >/dev/null 2>&1; then
-        print_success "✅ Frontend Server health check passed"
-    else
-        print_error "❌ Frontend Server health check failed"
+        print_error "❌ HTML Frontend (via Kong) health check failed"
     fi
     
     echo ""
@@ -312,7 +388,7 @@ uninstall_services() {
     
     # Step 1: Stop all running services
     print_status "1️⃣ Stopping all services..."
-    docker compose --profile html-frontend --profile frontend down --remove-orphans 2>/dev/null || true
+    docker compose --profile kong --profile html-frontend --profile frontend down --remove-orphans 2>/dev/null || true
     
     # Step 2: Remove all VuNG Bank containers (running and stopped)
     print_status "2️⃣ Removing all VuNG Bank containers..."
@@ -324,7 +400,7 @@ uninstall_services() {
     done
     
     # Remove service-specific containers
-    for service in "login-python-authenticator" "login-go-service" "accounts-go-service" "pdf-receipt-java-service" "payment-process-java-service" "corebanking-java-service" "payee-store-dotnet-service"; do
+    for service in "login-python-authenticator" "login-go-service" "accounts-go-service" "pdf-receipt-java-service" "payment-process-java-service" "corebanking-java-service" "payee-store-dotnet-service" "kong-postgres" "kong-migrations" "vubank-kong-gateway"; do
         if docker ps -a --format "{{.Names}}" | grep -q "^${service}$"; then
             print_status "   Removing container: $service"
             docker rm -f "$service" 2>/dev/null || true
@@ -353,7 +429,7 @@ uninstall_services() {
     
     # Step 4: Remove all volumes
     print_status "4️⃣ Removing all VuNG Bank volumes..."
-    docker volume ls --format "{{.Name}}" | grep -E "(vubank|vungbank|postgres_data|redis_data)" | while read volume; do
+    docker volume ls --format "{{.Name}}" | grep -E "(vubank|vungbank|postgres_data|kong_postgres_data|kong_logs|redis_data)" | while read volume; do
         if [ -n "$volume" ]; then
             print_status "   Removing volume: $volume"
             docker volume rm -f "$volume" 2>/dev/null || true
@@ -408,6 +484,44 @@ uninstall_services() {
     echo ""
 }
 
+# Clean Docker build cache and force fresh builds
+clean_cache() {
+    print_header
+    print_status "Cleaning Docker build cache for fresh builds..."
+    echo ""
+    
+    # Step 1: Stop all running containers first
+    print_status "1️⃣ Stopping all running VuNG Bank containers..."
+    docker compose --profile kong --profile html-frontend --profile frontend down --remove-orphans 2>/dev/null || true
+    
+    # Step 2: Clean Docker build cache
+    print_status "2️⃣ Cleaning Docker build cache..."
+    docker builder prune -a -f 2>/dev/null || true
+    
+    # Step 3: Remove VuNG Bank images to force rebuild
+    print_status "3️⃣ Removing VuNG Bank images to force fresh rebuild..."
+    docker images | grep -E "(vubank|vungbank)" | awk '{print $3}' | while read image_id; do
+        if [ -n "$image_id" ] && [ "$image_id" != "IMAGE" ]; then
+            print_status "   Removing image: $image_id"
+            docker rmi -f "$image_id" 2>/dev/null || true
+        fi
+    done
+    
+    # Step 4: Clean unused Docker resources
+    print_status "4️⃣ Cleaning unused Docker resources..."
+    docker system prune -f 2>/dev/null || true
+    
+    echo ""
+    print_success "✅ Docker build cache cleaned successfully!"
+    print_status "💡 Next start/restart will build everything fresh from scratch."
+    echo ""
+    
+    # Show cache usage before and after
+    print_status "📊 Current Docker system usage:"
+    docker system df 2>/dev/null || echo "Docker system df not available"
+    echo ""
+}
+
 # Display help
 show_help() {
     print_header
@@ -422,6 +536,7 @@ show_help() {
     echo "  restart   - Restart all services"
     echo "  install   - Install dependencies and setup"
     echo "  uninstall - Complete removal of all services, containers, images and volumes"
+    echo "  clean-cache - Clean Docker build cache and force fresh builds"
     echo "  logs      - Show service logs"
     echo "  health    - Run health checks"
     echo "  help      - Show this help message"
@@ -431,6 +546,7 @@ show_help() {
     echo "  ./manage-services.sh status                   # Check service status"
     echo "  ./manage-services.sh restart                  # Restart all services"
     echo "  ./manage-services.sh uninstall                # Remove everything (containers, images, volumes)"
+    echo "  ./manage-services.sh clean-cache              # Clean Docker cache for fresh builds"
     echo ""
     echo "Services managed:"
     echo "  • PostgreSQL Database (port 5432)"
@@ -466,6 +582,9 @@ case "${1:-help}" in
         ;;
     "uninstall")
         uninstall_services
+        ;;
+    "clean-cache")
+        clean_cache
         ;;
     "logs")
         show_logs

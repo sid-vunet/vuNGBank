@@ -54,9 +54,9 @@ done
 
 print_success "All required files found"
 
-# Build the Docker image
-print_status "Building Docker image: vubank-html-frontend"
-docker build -f Dockerfile.html -t vubank-html-frontend .
+# Build the Docker image with --no-cache for fresh build
+print_status "Building Docker image: vubank-html-frontend (fresh build, no cache)"
+docker build --no-cache -f Dockerfile.html -t vubank-html-frontend .
 
 if [[ $? -eq 0 ]]; then
     print_success "Docker image built successfully!"

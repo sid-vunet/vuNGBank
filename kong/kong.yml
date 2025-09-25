@@ -1,0 +1,699 @@
+# Kong Gateway Configuration for VuNG Bank
+# Enterprise-level API Gateway with comprehensive APM monitoring
+# Port: 8086 | Database: PostgreSQL | APM: Elastic APM
+
+_format_version: "3.0"
+
+# Services Configuration
+services:
+  # Login Gateway Service (Go)
+  - name: login-service
+    url: http://login-go-service:8000
+    protocol: http
+    host: login-go-service
+    port: 8000
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - login
+      - go
+      - authentication
+
+  # Python Authentication Service
+  - name: auth-service
+    url: http://login-python-authenticator:8001
+    protocol: http
+    host: login-python-authenticator
+    port: 8001
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - auth
+      - python
+      - backend
+
+  # Accounts Service (Go)
+  - name: accounts-service
+    url: http://accounts-go-service:8002
+    protocol: http
+    host: accounts-go-service
+    port: 8002
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - accounts
+      - go
+      - backend
+
+  # PDF Receipt Service (Java)
+  - name: pdf-service
+    url: http://pdf-receipt-java-service:8003
+    protocol: http
+    host: pdf-receipt-java-service
+    port: 8003
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - pdf
+      - java
+      - backend
+
+  # Payment Processing Service (Java)
+  - name: payment-service
+    url: http://payment-process-java-service:8004
+    protocol: http
+    host: payment-process-java-service
+    port: 8004
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - payment
+      - java
+      - backend
+
+  # CoreBanking Service (Java)
+  - name: corebanking-service
+    url: http://corebanking-java-service:8005
+    protocol: http
+    host: corebanking-java-service
+    port: 8005
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - corebanking
+      - java
+      - backend
+
+  # Payee Store Service (.NET)
+  - name: payee-service
+    url: http://payee-store-dotnet-service:5004
+    protocol: http
+    host: payee-store-dotnet-service
+    port: 5004
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - payee
+      - dotnet
+      - backend
+
+  # Frontend Service (HTML/JS)
+  - name: frontend-service
+    url: http://vubank-html-frontend:80
+    protocol: http
+    host: vubank-html-frontend
+    port: 80
+    path: /
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - vubank
+      - frontend
+      - html
+      - ui
+
+# Routes Configuration
+routes:
+  # Frontend Routes
+  - name: frontend-root
+    service: frontend-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /
+    strip_path: false
+    preserve_host: false
+    tags:
+      - frontend
+      - ui
+
+  - name: frontend-pages
+    service: frontend-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /login.html
+      - /dashboard.html
+      - /FundTransfer.html
+      - /index.html
+    strip_path: false
+    preserve_host: false
+    tags:
+      - frontend
+      - pages
+
+  - name: frontend-assets
+    service: frontend-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /css
+      - /js
+      - /images
+      - /elastic-apm-rum.js
+    strip_path: false
+    preserve_host: false
+    tags:
+      - frontend
+      - assets
+
+  # API Routes - Login Gateway (Primary Entry Point)
+  - name: api-login
+    service: login-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/login
+    methods:
+      - POST
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - authentication
+      - login
+
+  - name: api-logout
+    service: login-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/logout
+    methods:
+      - POST
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - authentication
+      - logout
+
+  - name: api-session
+    service: login-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/session
+    methods:
+      - GET
+      - POST
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - session
+
+  - name: api-health-login
+    service: login-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/health
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - health
+      - monitoring
+
+  # Accounts API Routes
+  - name: api-accounts
+    service: accounts-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /accounts
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - accounts
+
+  - name: api-accounts-balance
+    service: accounts-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /accounts/balance
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - accounts
+      - balance
+
+  - name: api-accounts-statements
+    service: accounts-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /accounts/statements
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - accounts
+      - statements
+
+  - name: api-accounts-health
+    service: accounts-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /health
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - health
+      - accounts
+
+  # Payment Processing Routes
+  - name: api-payments-initiate
+    service: payment-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /payments/initiate
+    methods:
+      - POST
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - payments
+      - initiate
+
+  - name: api-payments-status
+    service: payment-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /payments/status
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - payments
+      - status
+
+  - name: api-payments-history
+    service: payment-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /payments/history
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - payments
+      - history
+
+  - name: api-payments-health
+    service: payment-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /payments/health
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - health
+      - payments
+
+  # Payee Management Routes
+  - name: api-payees
+    service: payee-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/payees
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - payees
+
+  - name: api-payees-health
+    service: payee-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/health
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - health
+      - payees
+
+  # PDF Receipt Routes
+  - name: api-pdf-generate
+    service: pdf-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/pdf/generate
+    methods:
+      - POST
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - pdf
+      - generate
+
+  - name: api-pdf-download
+    service: pdf-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/pdf/download
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - pdf
+      - download
+
+  - name: api-pdf-health
+    service: pdf-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /api/pdf/health
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - health
+      - pdf
+
+  # CoreBanking Routes
+  - name: api-corebanking
+    service: corebanking-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /core
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - corebanking
+
+  - name: api-corebanking-health
+    service: corebanking-service
+    protocols:
+      - http
+      - https
+    paths:
+      - /core/health
+    methods:
+      - GET
+    strip_path: false
+    preserve_host: false
+    tags:
+      - api
+      - health
+      - corebanking
+
+# Global Plugins Configuration
+plugins:
+  # Request/Response Logging Plugin
+  - name: http-log
+    config:
+      http_endpoint: http://elastic-apm-server:8200/intake/v2/events
+      method: POST
+      timeout: 10000
+      keepalive: 60000
+      content_type: application/x-ndjson
+      headers:
+        Authorization: "Bearer ${ELASTIC_APM_SECRET_TOKEN}"
+        Content-Type: application/x-ndjson
+      flush_timeout: 2
+    tags:
+      - logging
+      - apm
+
+  # Correlation ID Plugin for Distributed Tracing
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      generator: uuid#counter
+      echo_downstream: true
+    tags:
+      - tracing
+      - correlation
+
+  # Request ID Plugin
+  - name: request-id
+    config:
+      header_name: X-Request-ID
+      echo_downstream: true
+    tags:
+      - tracing
+      - request-id
+
+  # Prometheus Metrics Plugin
+  - name: prometheus
+    config:
+      per_consumer: true
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+    tags:
+      - metrics
+      - monitoring
+
+  # Request Size Limiting
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 128
+    tags:
+      - security
+      - limits
+
+  # Response Rate Limiting
+  - name: rate-limiting
+    config:
+      second: 100
+      minute: 1000
+      hour: 10000
+      day: 100000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+    tags:
+      - security
+      - rate-limiting
+
+  # CORS Plugin
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+        - HEAD
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - X-Auth-Token
+        - Authorization
+        - X-Correlation-ID
+        - X-Request-ID
+        - elastic-apm-traceparent
+        - traceparent
+        - tracestate
+      exposed_headers:
+        - X-Auth-Token
+        - X-Correlation-ID
+        - X-Request-ID
+        - elastic-apm-traceparent
+      credentials: true
+      max_age: 3600
+      preflight_continue: false
+    tags:
+      - security
+      - cors
+
+  # Security Headers Plugin
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Frame-Options: DENY"
+          - "X-Content-Type-Options: nosniff"
+          - "X-XSS-Protection: 1; mode=block"
+          - "Strict-Transport-Security: max-age=31536000; includeSubDomains"
+          - "Referrer-Policy: strict-origin-when-cross-origin"
+          - "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://91.203.133.240:30200 ws: wss:"
+    tags:
+      - security
+      - headers
+
+  # Request Transformer for APM Headers
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - "X-Kong-Gateway: vubank-gateway"
+          - "X-Gateway-Version: 1.0.0"
+      append:
+        headers:
+          - "X-Forwarded-By: kong-gateway"
+    tags:
+      - headers
+      - gateway
+
+# Consumer Configuration (for JWT and API Key auth)
+consumers:
+  - username: vubank-web-client
+    custom_id: web-portal-client
+    tags:
+      - web
+      - portal
+      - frontend
+
+  - username: vubank-mobile-client
+    custom_id: mobile-app-client
+    tags:
+      - mobile
+      - app
+      - client
+
+  - username: vubank-admin-client
+    custom_id: admin-panel-client
+    tags:
+      - admin
+      - management
+      - internal
+
+# JWT Credentials for Consumers
+jwt_secrets:
+  - consumer: vubank-web-client
+    key: vubank-web-portal
+    secret: vubank-super-secret-jwt-key-2023
+    algorithm: HS256
+    tags:
+      - jwt
+      - web
+
+  - consumer: vubank-mobile-client
+    key: vubank-mobile-app
+    secret: vubank-super-secret-jwt-key-2023
+    algorithm: HS256
+    tags:
+      - jwt
+      - mobile
+
+  - consumer: vubank-admin-client
+    key: vubank-admin-panel
+    secret: vubank-super-secret-jwt-key-2023
+    algorithm: HS256
+    tags:
+      - jwt
+      - admin
+
+# API Key Credentials for Consumers
+keyauth_credentials:
+  - consumer: vubank-web-client
+    key: web-portal-api-key-2023
+    tags:
+      - api-key
+      - web
+
+  - consumer: vubank-mobile-client
+    key: mobile-app-api-key-2023
+    tags:
+      - api-key
+      - mobile
+
+  - consumer: vubank-admin-client
+    key: admin-panel-api-key-2023
+    tags:
+      - api-key
+      - admin

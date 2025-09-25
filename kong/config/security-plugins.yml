@@ -1,0 +1,374 @@
+# Kong Enterprise Security Configuration
+# Advanced security policies and authentication for VuNG Bank
+
+# Add JWT Authentication Plugin to Protected Routes
+# This configuration secures API endpoints while preserving distributed tracing
+
+- name: jwt-auth-api-routes
+  route: 
+    - api-accounts
+    - api-accounts-balance  
+    - api-accounts-statements
+    - api-payments-initiate
+    - api-payments-status
+    - api-payments-history
+    - api-payees
+    - api-pdf-generate
+    - api-pdf-download
+    - api-corebanking
+  plugins:
+    - name: jwt
+      config:
+        uri_param_names:
+          - jwt
+        cookie_names:
+          - jwt
+        header_names:
+          - Authorization
+        claims_to_verify:
+          - exp
+          - sub
+        key_claim_name: iss
+        secret_is_base64: false
+        run_on_preflight: true
+        maximum_expiration: 3600
+        algorithm: HS256
+        tags:
+          - authentication
+          - jwt
+          - security
+
+# API Key Authentication for Service-to-Service Communication
+- name: api-key-internal-services
+  service:
+    - corebanking-service
+    - payment-service
+    - pdf-service
+  plugins:
+    - name: key-auth
+      config:
+        key_names:
+          - X-API-Key
+          - apikey
+        key_in_body: false
+        key_in_header: true
+        key_in_query: true
+        hide_credentials: true
+        run_on_preflight: true
+        tags:
+          - authentication
+          - api-key
+          - internal
+
+# Advanced Rate Limiting with Different Policies per Service Type
+- name: rate-limiting-frontend
+  service: frontend-service
+  plugins:
+    - name: rate-limiting-advanced
+      config:
+        limit:
+          - 100
+        window_size:
+          - 60
+        identifier: consumer
+        sync_rate: -1
+        strategy: local
+        dictionary_name: kong_rate_limiting_counters
+        hide_client_headers: false
+        tags:
+          - rate-limiting
+          - frontend
+
+- name: rate-limiting-api-heavy
+  route:
+    - api-payments-initiate
+    - api-pdf-generate
+    - api-corebanking
+  plugins:
+    - name: rate-limiting-advanced
+      config:
+        limit:
+          - 10
+          - 100
+        window_size:
+          - 60
+          - 3600
+        identifier: consumer
+        sync_rate: -1
+        strategy: local
+        dictionary_name: kong_rate_limiting_counters
+        hide_client_headers: false
+        tags:
+          - rate-limiting
+          - heavy-operations
+
+- name: rate-limiting-api-standard
+  route:
+    - api-login
+    - api-session
+    - api-accounts
+    - api-payments-status
+    - api-payees
+  plugins:
+    - name: rate-limiting-advanced
+      config:
+        limit:
+          - 50
+          - 500
+        window_size:
+          - 60
+          - 3600
+        identifier: consumer
+        sync_rate: -1
+        strategy: local
+        dictionary_name: kong_rate_limiting_counters
+        hide_client_headers: false
+        tags:
+          - rate-limiting
+          - standard-operations
+
+# IP Restriction for Admin Endpoints
+- name: ip-restriction-admin
+  route: 
+    - kong-admin-api
+  plugins:
+    - name: ip-restriction
+      config:
+        allow:
+          - 127.0.0.1
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        deny: []
+        tags:
+          - security
+          - ip-restriction
+          - admin
+
+# Bot Detection Plugin
+- name: bot-detection
+  plugins:
+    - name: bot-detection
+      config:
+        allow:
+          - googlebot
+          - bingbot
+        deny: 
+          - badbot
+          - scrapy
+          - curl
+          - wget
+        tags:
+          - security
+          - bot-detection
+
+# Request/Response Size Limiting
+- name: request-size-limiting-uploads
+  route:
+    - api-pdf-generate
+    - api-payments-initiate
+  plugins:
+    - name: request-size-limiting
+      config:
+        allowed_payload_size: 10
+        size_unit: megabytes
+        require_content_length: true
+        tags:
+          - security
+          - size-limiting
+          - uploads
+
+- name: response-size-limiting
+  plugins:
+    - name: response-size-limiting
+      config:
+        allowed_payload_size: 50
+        size_unit: megabytes
+        tags:
+          - security
+          - size-limiting
+          - response
+
+# Security Headers Enhancement
+- name: enhanced-security-headers
+  plugins:
+    - name: response-transformer-advanced
+      config:
+        add:
+          headers:
+            - "X-Frame-Options:DENY"
+            - "X-Content-Type-Options:nosniff"
+            - "X-XSS-Protection:1; mode=block"
+            - "Strict-Transport-Security:max-age=31536000; includeSubDomains; preload"
+            - "Referrer-Policy:strict-origin-when-cross-origin"
+            - "Permissions-Policy:geolocation=(), microphone=(), camera=()"
+            - "Content-Security-Policy:default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://91.203.133.240:30200 ws: wss:; font-src 'self' data:; object-src 'none'; media-src 'self'; frame-src 'none';"
+            - "X-Robots-Tag:noindex, nofollow, nosnippet, noarchive"
+        remove:
+          headers:
+            - Server
+            - X-Powered-By
+        replace:
+          headers:
+            - "Cache-Control:no-cache, no-store, must-revalidate"
+        tags:
+          - security
+          - headers
+          - enhanced
+
+# HMAC Authentication for Critical Operations
+- name: hmac-critical-operations
+  route:
+    - api-payments-initiate
+    - api-corebanking
+  plugins:
+    - name: hmac-auth
+      config:
+        hide_credentials: true
+        clock_skew: 300
+        validate_request_body: true
+        enforce_headers:
+          - date
+          - request-line
+        algorithms:
+          - hmac-sha256
+          - hmac-sha512
+        tags:
+          - authentication
+          - hmac
+          - critical
+
+# OAuth 2.0 for External API Access
+- name: oauth2-external-api
+  route:
+    - api-accounts
+    - api-payments-status
+    - api-payees
+  plugins:
+    - name: oauth2
+      config:
+        enable_authorization_code: true
+        enable_client_credentials: true
+        enable_implicit_grant: false
+        enable_password_grant: true
+        token_expiration: 3600
+        auth_header_name: authorization
+        scopes:
+          - read
+          - write
+          - admin
+        mandatory_scope: true
+        provision_key: vubank-oauth-provision-key
+        accept_http_if_already_terminated: true
+        tags:
+          - authentication
+          - oauth2
+          - external
+
+# Request Termination for Maintenance Mode
+- name: maintenance-mode
+  plugins:
+    - name: request-termination
+      config:
+        status_code: 503
+        content_type: application/json
+        body: '{"message": "VuNG Bank is under maintenance. Please try again later.", "retry_after": 3600}'
+        tags:
+          - maintenance
+          - termination
+      enabled: false  # Set to true during maintenance
+
+# Advanced CORS with Dynamic Origins
+- name: advanced-cors
+  plugins:
+    - name: cors-advanced
+      config:
+        origins:
+          - https://vubank.com
+          - https://app.vubank.com
+          - https://admin.vubank.com
+          - http://localhost:8086
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+          - HEAD
+          - PATCH
+        headers:
+          - Accept
+          - Accept-Version
+          - Content-Length
+          - Content-MD5
+          - Content-Type
+          - Date
+          - X-Auth-Token
+          - Authorization
+          - X-API-Key
+          - X-Correlation-ID
+          - X-Request-ID
+          - elastic-apm-traceparent
+          - traceparent
+          - tracestate
+          - X-HMAC-Signature
+          - X-HMAC-Algorithm
+        exposed_headers:
+          - X-Auth-Token
+          - X-Correlation-ID
+          - X-Request-ID
+          - elastic-apm-traceparent
+          - X-RateLimit-Limit
+          - X-RateLimit-Remaining
+          - X-RateLimit-Reset
+        credentials: true
+        max_age: 7200
+        preflight_continue: false
+        tags:
+          - security
+          - cors
+          - advanced
+
+# Session Management
+- name: session-management
+  route:
+    - api-login
+    - api-session
+    - api-logout
+  plugins:
+    - name: session
+      config:
+        cookie_name: vubank_session
+        cookie_lifetime: 3600
+        cookie_idletime: 900
+        cookie_renew: 600
+        cookie_secure: true
+        cookie_httponly: true
+        cookie_samesite: Strict
+        storage: cookie
+        logout_methods:
+          - POST
+          - DELETE
+        logout_query_arg: logout
+        logout_post_arg: logout
+        tags:
+          - session
+          - authentication
+          - cookies
+
+# API Versioning
+- name: api-versioning
+  plugins:
+    - name: request-transformer-advanced
+      config:
+        add:
+          headers:
+            - "X-API-Version:v1.0"
+            - "X-Service-Version:2024.1"
+        remove:
+          querystring: []
+        replace:
+          uri: "/api/v1/(.*):/api/$1"
+        tags:
+          - versioning
+          - api-management

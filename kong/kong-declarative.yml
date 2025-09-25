@@ -1,0 +1,23 @@
+_format_version: "3.0"
+
+services:
+  - name: login-service
+    url: http://login-go-service:8000
+    
+  - name: auth-service
+    url: http://login-python-authenticator:8001
+
+routes:
+  - name: login-route
+    service: login-service
+    paths: 
+      - /api/login
+      - /api/logout
+      - /api/session
+    
+  - name: auth-route
+    service: auth-service
+    paths:
+      - /health
+
+plugins: []
