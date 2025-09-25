@@ -23,25 +23,60 @@ from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize comprehensive Elastic APM client (matching Go services and RUM)
+# Initialize comprehensive Elastic APM client (matching Go services and RUM with maximum observability)
 apm_config = {
     'SERVICE_NAME': os.getenv('ELASTIC_APM_SERVICE_NAME', 'login-python-authenticator'),
     'SERVER_URL': os.getenv('ELASTIC_APM_SERVER_URL', 'http://91.203.133.240:30200'),
     'ENVIRONMENT': os.getenv('ELASTIC_APM_ENVIRONMENT', 'production'),
     'SERVICE_VERSION': os.getenv('ELASTIC_APM_SERVICE_VERSION', '1.0.0'),
+    
+    # Sampling configuration (100% like RUM and other services)
     'TRANSACTION_SAMPLE_RATE': float(os.getenv('ELASTIC_APM_TRANSACTION_SAMPLE_RATE', '1.0')),
     'SPAN_SAMPLE_RATE': float(os.getenv('ELASTIC_APM_SPAN_SAMPLE_RATE', '1.0')),
+    
+    # Data capture configuration (maximum like other services)
     'CAPTURE_BODY': 'all',  # Comprehensive body capture like Go services
-    'CAPTURE_HEADERS': False,  # Disable to avoid configuration issues
+    'CAPTURE_HEADERS': True,  # Enable comprehensive headers capture to match other services
+    
+    # Distributed tracing configuration (matching RUM distributedTracingOrigins)
     'USE_DISTRIBUTED_TRACING': True,
     'DISTRIBUTED_TRACING_ORIGINS': ['*'],
+    
+    # Advanced configuration for maximum observability
     'STACK_TRACE_LIMIT': 50,
     'TRANSACTION_MAX_SPANS': 500,
-    'LOG_LEVEL': 'info'
+    'SPAN_FRAMES_MIN_DURATION': 0,  # Capture all spans like other services
+    'LOG_LEVEL': 'info',
+    
+    # Performance monitoring settings (matching other services)
+    'DISABLE_METRICS': False,  # Enable all metrics
+    'METRICS_INTERVAL': '30s',  # Frequent metrics collection
+    'MAX_QUEUE_SIZE': 1000,     # Large queue for high throughput
+    'FLUSH_INTERVAL': '1s',     # Fast flush for real-time monitoring
+    
+    # Python-specific comprehensive monitoring
+    'INSTRUMENT': True,         # Enable all automatic instrumentation
+    'DJANGO_TRANSACTION_NAME_FROM_ROUTE': True,  # Better transaction names
+    'COLLECT_LOCAL_VARIABLES': 'all',  # Capture local variables in errors
+    'SOURCE_LINES_ERROR_LIBRARY_FRAMES': 3,  # More context in error traces
+    'SOURCE_LINES_SPAN_LIBRARY_FRAMES': 3,   # More context in span traces
+    'RECORDING': True,          # Ensure recording is enabled
+    
+    # Database and HTTP monitoring
+    'DJANGO_DB_CAPTURE_QUERY': True,  # Capture database queries
+    'CAPTURE_ELASTICSEARCH_QUERIES': True,  # If using Elasticsearch
 }
 
 apm_client = make_apm_client(apm_config)
-logger.info(f"Initialized APM client with server: {apm_config['SERVER_URL']}")
+logger.info("🔧 Comprehensive APM Configuration Applied:")
+logger.info(f"   Server: {apm_config['SERVER_URL']}")
+logger.info(f"   Service: {apm_config['SERVICE_NAME']} v{apm_config['SERVICE_VERSION']} ({apm_config['ENVIRONMENT']})")
+logger.info(f"   Sampling: Transactions={apm_config['TRANSACTION_SAMPLE_RATE']*100}%, Spans={apm_config['SPAN_SAMPLE_RATE']*100}%")
+logger.info(f"   Capture: Body={apm_config['CAPTURE_BODY']}, Headers={apm_config['CAPTURE_HEADERS']}")
+logger.info(f"   Tracing: Distributed={apm_config['USE_DISTRIBUTED_TRACING']}")
+logger.info("   Features: Database monitoring, HTTP tracing, authentication flows")
+logger.info("   Monitoring: Maximum observability matching RUM frontend")
+print("✅ Python APM client initialized with comprehensive configuration matching other services")
 
 app = FastAPI(title="VuBank Authentication Service", version="1.0.0")
 

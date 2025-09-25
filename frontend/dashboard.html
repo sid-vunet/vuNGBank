@@ -13,41 +13,42 @@
     <!-- Elastic RUM Agent - Temporarily Disabled -->
     <!-- <script src="./elastic-apm-rum.js" crossorigin></script> -->
     <script>
-        // Initialize mock APM object to prevent errors
-        window.elasticApm = {
-            init: () => ({}),
-            setUserContext: () => {},
-            setCustomContext: () => {},
-            addLabels: () => {},
-            startTransaction: () => ({ end: () => {} }),
-            startSpan: () => ({ end: () => {} })
-        };
-        /*
-        // Initialize Elastic RUM with MAXIMUM automatic data capture
+        // Initialize Elastic RUM with MAXIMUM automatic data capture (Kong Gateway Configuration)
         window.elasticApm = elasticApm.init({
             // === CORE CONFIGURATION ===
             serviceName: 'vubank-frontend',
             serverUrl: 'http://91.203.133.240:30200',
-            serviceVersion: '1.0.0',
+            serviceVersion: '1.2.0',
             environment: 'production',
             
-            // === DISTRIBUTED TRACING (Temporarily disabled to eliminate CORS errors) ===
-            distributedTracing: false,
+            // === DISTRIBUTED TRACING (Optimized for Kong Gateway) ===
+            distributedTracing: true,
             distributedTracingOrigins: [
-                // Kong Gateway (main API endpoint for browser)
+                // Kong Gateway (primary API endpoint - all backend services via Kong)
                 'http://localhost:8086',
                 
-                // Local development endpoints (if directly accessible)
-                'http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 
-                'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
-                'http://localhost:5004',
+                // Frontend endpoints
+                'http://localhost:3001',  // HTML frontend
+                'http://localhost:3000',  // React frontend (if used)
+                window.location.origin,   // Current page origin
                 
                 // APM server endpoints
                 'http://91.203.133.240:30200',
                 'https://91.203.133.240:30200',
                 
-                // Current frontend host
-                window.location.origin
+                // Direct microservice endpoints (fallback for Kong bypassing)
+                'http://login-go-service:8000',
+                'http://login-python-authenticator:8001', 
+                'http://accounts-go-service:8002',
+                'http://pdf-receipt-java-service:8003',
+                'http://payment-process-java-service:8004',
+                'http://corebanking-java-service:8005',
+                'http://payee-store-dotnet-service:5004',
+                
+                // Local development endpoints (direct service ports)
+                'http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 
+                'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
+                'http://localhost:5004'
             ],
             
             // === AUTOMATIC INSTRUMENTATION (Enable Everything) ===
@@ -79,13 +80,8 @@
             captureUnhandledRejections: true, // Promise rejections
             
             // === PERFORMANCE MONITORING ===
-            // Transaction sampling
             transactionSampleRate: 1.0,    // Capture 100% of transactions
-            
-            // Span sampling  
             spanSampleRate: 1.0,          // Capture 100% of spans
-            
-            // Transaction timeout
             transactionTimeout: 30000,     // 30 second timeout for long operations
             
             // === RESOURCE MONITORING ===
@@ -96,65 +92,119 @@
             
             // === SESSION TRACKING ===
             session: true,                 // Enable session tracking
-            sessionTimeout: 30 * 60 * 1000, // 30 minute sessions
             
-            // === SPAN CONFIGURATION ===
-            spanStackTraceMinDuration: 0,  // Capture stack traces for all spans
-            spanCompressionEnabled: false, // Disable compression for full detail
-            
-            // === LOGGING ===
-            logLevel: 'trace',            // Maximum logging detail
-            sendCredentials: false,        // Security consideration
-            
-            // === METADATA CAPTURE ===
-            captureSpanStackTraces: true, // Stack traces in spans
-            sourcemapsEnabled: true,      // Source map support
-            
-            // === CONTEXT PROPAGATION ===
-            propagateTracestate: true,    // W3C trace context
-            
-            // === CUSTOM CONTEXT (Automatic) ===
+            // === BANKING-SPECIFIC CONFIGURATION ===
             context: {
-                user: {
-                    id: 'auto-detected',
-                    username: 'auto-detected', 
-                    email: 'auto-detected'
+                service: {
+                    framework: 'vanilla-js',
+                    runtime: 'browser'
                 },
                 custom: {
-                    application: 'vubank-frontend',
-                    version: '1.0.0',
-                    page: 'dashboard-page'
+                    application: 'VuNG Bank',
+                    module: 'dashboard',
+                    api_gateway: 'kong',
+                    gateway_endpoint: 'http://localhost:8086'
                 }
             },
             
-            // === LONG TASK MONITORING ===
-            longTask: {
-                threshold: 50 // Capture tasks longer than 50ms
+            // === ADVANCED OBSERVABILITY ===
+            instrument: true,
+            monitorLongtasks: true,        // Long task monitoring
+            captureSpanStackTraces: true,  // Stack traces for spans
+            
+            // === SAMPLING CONFIGURATION ===
+            ignoreTransactions: [
+                '/health',
+                '/ping',
+                '/favicon.ico'
+            ]
+        });
+        
+        // === BANKING-SPECIFIC APM INSTRUMENTATION ===
+        
+        // Custom APM utilities for banking operations
+        window.bankingAPM = {
+            // Track banking transactions with detailed context
+            trackBankingTransaction: function(type, details) {
+                if (window.elasticApm && window.elasticApm.startTransaction) {
+                    const transaction = window.elasticApm.startTransaction(`banking-${type}`, 'banking-operation');
+                    if (transaction && details) {
+                        transaction.addContext({
+                            custom: {
+                                transaction_type: type,
+                                amount: details.amount || 0,
+                                from_account: details.fromAccount || 'unknown',
+                                to_account: details.toAccount || 'unknown',
+                                payment_mode: details.paymentMode || 'unknown',
+                                user_id: localStorage.getItem('customerId') || 'anonymous',
+                                session_id: localStorage.getItem('sessionId') || 'unknown'
+                            }
+                        });
+                        transaction.addLabels({
+                            banking_operation: type,
+                            user_action: 'transaction',
+                            module: 'dashboard'
+                        });
+                    }
+                    return transaction;
+                }
+                return null;
             },
             
-            // === CENTRAL CONFIGURATION ===
-            centralConfig: true,          // Allow server-side config updates
-            
-            // === ADVANCED PERFORMANCE ===
-            memoryLimit: 10 * 1024 * 1024, // 10MB memory limit
-            queueLimit: 1000,             // Large event queue
-            flushInterval: 500,           // Flush every 500ms
-            
-            // === EXPERIMENTAL FEATURES ===
-            experimental: {
-                asyncStack: true,         // Async stack traces
+            // Track API calls with Kong gateway context
+            trackKongAPICall: function(endpoint, method, serviceType) {
+                if (window.elasticApm && window.elasticApm.startSpan) {
+                    const span = window.elasticApm.startSpan(`kong-${method.toLowerCase()}-${serviceType}`, 'http.kong');
+                    if (span) {
+                        span.addContext({
+                            http: {
+                                method: method,
+                                url: endpoint
+                            },
+                            custom: {
+                                gateway: 'kong',
+                                service_type: serviceType,
+                                endpoint: endpoint
+                            }
+                        });
+                        span.addLabels({
+                            kong_service: serviceType,
+                            api_method: method,
+                            gateway: 'kong'
+                        });
+                    }
+                    return span;
+                }
+                return null;
             },
             
-            // === API REQUEST DETAILS ===
-            apiRequestTime: true,         // Capture API timings
-            apiRequestSize: true,         // Capture request sizes
-            
-            // === BROWSER METRICS ===
-            browserHistory: true,         // Browser history changes
-            
-            // Enable active monitoring
-            active: true
-        }); */
+            // Track user interactions with detailed context
+            trackUserInteraction: function(action, elementType, elementId) {
+                if (window.elasticApm && window.elasticApm.startTransaction) {
+                    const transaction = window.elasticApm.startTransaction(`user-${action}`, 'user-interaction');
+                    if (transaction) {
+                        transaction.addContext({
+                            custom: {
+                                action: action,
+                                element_type: elementType,
+                                element_id: elementId,
+                                page: 'dashboard',
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                        transaction.addLabels({
+                            user_action: action,
+                            ui_element: elementType,
+                            page: 'dashboard'
+                        });
+                    }
+                    return transaction;
+                }
+                return null;
+            }
+        };
+        
+        
         
         // Enhanced authentication validation function
         async function validateAuthenticationOnLoad() {

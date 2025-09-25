@@ -22,22 +22,33 @@
             environment: 'production',
             
             // === DISTRIBUTED TRACING (Temporarily disabled to eliminate CORS errors) ===
-            distributedTracing: false,
+            distributedTracing: true,
             distributedTracingOrigins: [
-                // Kong Gateway (main API endpoint for browser)
+                // Kong Gateway (primary API endpoint - all backend services via Kong)
                 'http://localhost:8086',
                 
-                // Local development endpoints (if directly accessible)
-                'http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 
-                'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
-                'http://localhost:5004',
+                // Frontend endpoints
+                'http://localhost:3001',  // HTML frontend
+                'http://localhost:3000',  // React frontend (if used)
+                window.location.origin,   // Current page origin
                 
                 // APM server endpoints
                 'http://91.203.133.240:30200',
                 'https://91.203.133.240:30200',
                 
-                // Current frontend host
-                window.location.origin
+                // Direct microservice endpoints (fallback for Kong bypassing)
+                'http://login-go-service:8000',
+                'http://login-python-authenticator:8001', 
+                'http://accounts-go-service:8002',
+                'http://pdf-receipt-java-service:8003',
+                'http://payment-process-java-service:8004',
+                'http://corebanking-java-service:8005',
+                'http://payee-store-dotnet-service:5004',
+                
+                // Local development endpoints (direct service ports)
+                'http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 
+                'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
+                'http://localhost:5004'
             ],
             
             // === AUTOMATIC INSTRUMENTATION (Enable Everything) ===
