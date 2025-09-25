@@ -293,6 +293,121 @@ health_check() {
     check_status
 }
 
+# Complete uninstall - remove all containers, images, volumes and networks
+uninstall_services() {
+    print_header
+    print_warning "⚠️  WARNING: This will completely remove all VuNG Bank services, containers, images, volumes and data!"
+    print_warning "⚠️  This action cannot be undone and all data will be lost!"
+    echo ""
+    
+    read -p "Are you sure you want to proceed? Type 'YES' to continue: " confirmation
+    if [ "$confirmation" != "YES" ]; then
+        print_status "Uninstall cancelled."
+        return 0
+    fi
+    
+    echo ""
+    print_status "🧹 Starting complete cleanup..."
+    echo ""
+    
+    # Step 1: Stop all running services
+    print_status "1️⃣ Stopping all services..."
+    docker compose --profile html-frontend --profile frontend down --remove-orphans 2>/dev/null || true
+    
+    # Step 2: Remove all VuNG Bank containers (running and stopped)
+    print_status "2️⃣ Removing all VuNG Bank containers..."
+    docker ps -a --filter "name=vubank" --format "{{.Names}}" | while read container; do
+        if [ -n "$container" ]; then
+            print_status "   Removing container: $container"
+            docker rm -f "$container" 2>/dev/null || true
+        fi
+    done
+    
+    # Remove service-specific containers
+    for service in "login-python-authenticator" "login-go-service" "accounts-go-service" "pdf-receipt-java-service" "payment-process-java-service" "corebanking-java-service" "payee-store-dotnet-service"; do
+        if docker ps -a --format "{{.Names}}" | grep -q "^${service}$"; then
+            print_status "   Removing container: $service"
+            docker rm -f "$service" 2>/dev/null || true
+        fi
+    done
+    
+    # Step 3: Remove all VuNG Bank images
+    print_status "3️⃣ Removing all VuNG Bank Docker images..."
+    
+    # Remove images by repository pattern
+    docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "(vubank|vungbank)" | while read image; do
+        if [ -n "$image" ]; then
+            print_status "   Removing image: $image"
+            docker rmi -f "$image" 2>/dev/null || true
+        fi
+    done
+    
+    # Remove service-specific images by service directory names
+    for service_dir in "login-python-authenticator" "login-go-service" "accounts-go-service" "pdf-receipt-java-service" "payment-process-java-service" "corebanking-java-service" "payee-store-dotnet-service" "frontend"; do
+        service_image="${PROJECT_DIR##*/}_${service_dir}"
+        if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "$service_image"; then
+            print_status "   Removing image: $service_image"
+            docker rmi -f "$service_image" 2>/dev/null || true
+        fi
+    done
+    
+    # Step 4: Remove all volumes
+    print_status "4️⃣ Removing all VuNG Bank volumes..."
+    docker volume ls --format "{{.Name}}" | grep -E "(vubank|vungbank|postgres_data|redis_data)" | while read volume; do
+        if [ -n "$volume" ]; then
+            print_status "   Removing volume: $volume"
+            docker volume rm -f "$volume" 2>/dev/null || true
+        fi
+    done
+    
+    # Remove project-specific volumes
+    project_name="${PROJECT_DIR##*/}"
+    docker volume ls --format "{{.Name}}" | grep "^${project_name}_" | while read volume; do
+        if [ -n "$volume" ]; then
+            print_status "   Removing volume: $volume"
+            docker volume rm -f "$volume" 2>/dev/null || true
+        fi
+    done
+    
+    # Step 5: Remove networks
+    print_status "5️⃣ Removing VuNG Bank networks..."
+    docker network ls --format "{{.Name}}" | grep -E "(vubank|vungbank)" | while read network; do
+        if [ -n "$network" ] && [ "$network" != "bridge" ] && [ "$network" != "host" ] && [ "$network" != "none" ]; then
+            print_status "   Removing network: $network"
+            docker network rm "$network" 2>/dev/null || true
+        fi
+    done
+    
+    # Remove project-specific network
+    project_network="${project_name}_vubank-network"
+    if docker network ls --format "{{.Name}}" | grep -q "^${project_network}$"; then
+        print_status "   Removing network: $project_network"
+        docker network rm "$project_network" 2>/dev/null || true
+    fi
+    
+    # Step 6: Clean up dangling images and build cache
+    print_status "6️⃣ Cleaning up Docker system..."
+    docker system prune -f 2>/dev/null || true
+    
+    # Step 7: Remove any remaining orphaned containers
+    print_status "7️⃣ Final cleanup - removing any orphaned containers..."
+    docker container prune -f 2>/dev/null || true
+    
+    echo ""
+    print_success "✅ Complete uninstall finished!"
+    print_success "🎯 All VuNG Bank services, containers, images, volumes and networks have been removed."
+    print_status "💡 You can run './manage-services.sh install' to set up the services again."
+    echo ""
+    
+    # Show remaining Docker resources for verification
+    print_status "📋 Remaining Docker resources summary:"
+    echo "   Containers: $(docker ps -a | wc -l) total"
+    echo "   Images: $(docker images | wc -l) total"
+    echo "   Volumes: $(docker volume ls | wc -l) total"
+    echo "   Networks: $(docker network ls | wc -l) total"
+    echo ""
+}
+
 # Display help
 show_help() {
     print_header
@@ -306,6 +421,7 @@ show_help() {
     echo "  stop      - Stop all services"
     echo "  restart   - Restart all services"
     echo "  install   - Install dependencies and setup"
+    echo "  uninstall - Complete removal of all services, containers, images and volumes"
     echo "  logs      - Show service logs"
     echo "  health    - Run health checks"
     echo "  help      - Show this help message"
@@ -314,6 +430,7 @@ show_help() {
     echo "  ./manage-services.sh start                    # Start all services"
     echo "  ./manage-services.sh status                   # Check service status"
     echo "  ./manage-services.sh restart                  # Restart all services"
+    echo "  ./manage-services.sh uninstall                # Remove everything (containers, images, volumes)"
     echo ""
     echo "Services managed:"
     echo "  • PostgreSQL Database (port 5432)"
@@ -325,6 +442,8 @@ show_help() {
     echo "  • Java CoreBanking Service (port 8005)"
     echo "  • .NET Payee Service (port 5004)"
     echo "  • HTML Frontend Container (port 3001)"
+    echo ""
+    echo "Note: Redis has been removed as it's not currently needed by the services."
     echo ""
 }
 
@@ -344,6 +463,9 @@ case "${1:-help}" in
         ;;
     "install")
         install_dependencies
+        ;;
+    "uninstall")
+        uninstall_services
         ;;
     "logs")
         show_logs

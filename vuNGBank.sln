@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "services", "services", "{3C755975-A7BD-44BC-C8F9-5B13F14529BF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PayeeService", "backend\services\payee-store-dotnet-service\PayeeService.csproj", "{15F53AB8-3578-2448-1DD1-19D3B58BF7CB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{15F53AB8-3578-2448-1DD1-19D3B58BF7CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15F53AB8-3578-2448-1DD1-19D3B58BF7CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15F53AB8-3578-2448-1DD1-19D3B58BF7CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15F53AB8-3578-2448-1DD1-19D3B58BF7CB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3C755975-A7BD-44BC-C8F9-5B13F14529BF} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
+		{15F53AB8-3578-2448-1DD1-19D3B58BF7CB} = {3C755975-A7BD-44BC-C8F9-5B13F14529BF}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2916EACD-41F9-44C2-A6BB-ECDDE101F41F}
+	EndGlobalSection
+EndGlobal

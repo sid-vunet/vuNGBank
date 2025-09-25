@@ -1,21 +1,4 @@
 services:
-  # Redis for Transaction State Management
-  redis:
-    image: redis:7-alpine
-    container_name: vubank-redis
-    command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - vubank-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
   # PostgreSQL Database
   vubank-postgres:
     image: postgres:15
@@ -287,7 +270,6 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
 
 networks:
   vubank-network:
