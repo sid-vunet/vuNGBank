@@ -259,13 +259,30 @@ echo "🛣️  Configuring Kong routes..."
 create_accounts_route "accounts-service" "/api/accounts" "/internal/accounts"
 create_route "login-python-authenticator" "/api/auth"
 create_route "login-go-service" "/api/login"
+create_route "login-go-service" "/api/logout"
 create_route "corebanking-java-service" "/api/corebanking"
 create_strip_route "payment-process-java-service" "/api/payments"
 create_route "payee-store-dotnet-service" "/api/payees"
 create_route "pdf-receipt-java-service" "/api/pdf"
 
-# Configure frontend route (special handling)
+# Configure frontend routes (root and specific HTML pages)
 create_frontend_route "frontend-service" "/"
+
+# Add specific routes for all HTML pages that use dynamic URLs
+echo "🌐 Adding specific HTML page routes with dynamic URL support..."
+html_pages=("index.html" "login.html" "dashboard.html" "FundTransfer.html")
+
+for page in "${html_pages[@]}"; do
+    echo "🔗 Creating route for /$page"
+    curl -s -X POST \
+        --url "$KONG_ADMIN_URL/services/frontend-service/routes" \
+        --data "paths[]=/$page" \
+        --data "methods[]=GET" \
+        --data "strip_path=false" \
+        --data "preserve_host=false" \
+        --data "regex_priority=5" > /dev/null
+    echo "✅ Route created for /$page"
+done
 
 echo "🎉 Kong Gateway configuration completed successfully!"
 
@@ -276,12 +293,16 @@ echo "Services configured: $(curl -s "$KONG_ADMIN_URL/services" | python3 -c "im
 echo "Routes configured: $(curl -s "$KONG_ADMIN_URL/routes" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['data']))" 2>/dev/null || echo "Unknown")"
 
 echo ""
-echo "🔗 VuNG Bank Access Points:"
+echo "🔗 VuNG Bank Access Points (All with Dynamic URL Support):"
 echo "  🌐 Main Portal:    http://localhost:8086/"
+echo "  🏠 Index Page:     http://localhost:8086/index.html"
 echo "  🔐 Login:          http://localhost:8086/login.html"
 echo "  📊 Dashboard:      http://localhost:8086/dashboard.html"  
-echo "  💸 Transfer:       http://localhost:8086/FundTransfer.html"
+echo "  💸 Fund Transfer:  http://localhost:8086/FundTransfer.html"
 echo "  🏥 Health Check:   http://localhost:8086/health"
+echo ""
+echo "  ✨ All pages now use window.location.origin for API calls"
+echo "  ✨ Works with any domain/IP: 91.203.133.240:8086, localhost:8086, etc."
 echo ""
 echo "🛠️  Kong Management:"
 echo "  📡 Admin API:      http://localhost:8001"

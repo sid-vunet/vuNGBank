@@ -28,7 +28,7 @@
             distributedTracing: true,
             distributedTracingOrigins: [
                 // Kong Gateway (primary API endpoint - all backend services via Kong)
-                'http://localhost:8086',
+                window.location.origin,
                 
                 // Frontend endpoints
                 'http://localhost:3001',  // HTML frontend
@@ -912,7 +912,7 @@
                 console.log('✅ elasticApm available, proceeding with login...');
                 
                 const formData = new FormData(this.form);
-                const apiUrl = 'http://localhost:8086'; // Kong Gateway API URL
+                const apiUrl = window.location.origin; // Use current domain/IP - Kong Gateway
                 
                 try {
                     // Add 1-second delay to demonstrate loading state

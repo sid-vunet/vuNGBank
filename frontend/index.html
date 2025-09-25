@@ -25,7 +25,7 @@
             distributedTracing: true,
             distributedTracingOrigins: [
                 // Kong Gateway (primary API endpoint - all backend services via Kong)
-                'http://localhost:8086',
+                window.location.origin,
                 
                 // Frontend endpoints
                 'http://localhost:3001',  // HTML frontend

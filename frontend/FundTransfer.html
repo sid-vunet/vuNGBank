@@ -14,24 +14,12 @@
             serviceName: 'vubank-frontend',
             serverUrl: 'http://91.203.133.240:30200',
             serviceVersion: '1.0.0',
-            environment: 'production',
+            environment: 'e2e-prod',
             
-            // === DISTRIBUTED TRACING (Optimized for Kong Gateway) ===
+            // === DISTRIBUTED TRACING (Maximum Coverage with Actual Service Names) ===
             distributedTracing: true,
             distributedTracingOrigins: [
-                // Kong Gateway (primary API endpoint - all backend services via Kong)
-                'http://localhost:8086',
-                
-                // Frontend endpoints
-                'http://localhost:3001',  // HTML frontend
-                'http://localhost:3000',  // React frontend (if used)
-                window.location.origin,   // Current page origin
-                
-                // APM server endpoints
-                'http://91.203.133.240:30200',
-                'https://91.203.133.240:30200',
-                
-                // Direct microservice endpoints (fallback for Kong bypassing)
+                // Container-based service names (for production)
                 'http://login-go-service:8000',
                 'http://login-python-authenticator:8001', 
                 'http://accounts-go-service:8002',
@@ -40,10 +28,24 @@
                 'http://corebanking-java-service:8005',
                 'http://payee-store-dotnet-service:5004',
                 
-                // Local development endpoints (direct service ports)
+                // Kong Gateway and current domain
+                window.location.origin,
                 'http://localhost:8000', 'http://localhost:8001', 'http://localhost:8002', 
                 'http://localhost:8003', 'http://localhost:8004', 'http://localhost:8005',
-                'http://localhost:5004'
+                'http://localhost:5004',
+                
+                // APM server endpoints (IP and hostname variants)
+                'http://91.203.133.240:30200',
+                'http://apm-server:30200',
+                'https://91.203.133.240:30200',
+                'https://apm-server:30200',
+                
+                // Docker compose service names (internal network)
+                'http://vubank-frontend:3000',
+                'http://vubank-html-frontend:80',
+                
+                // Catch-all for any other origins
+                '*'
             ],
             
             // === AUTOMATIC INSTRUMENTATION (Enable Everything) ===
@@ -1598,7 +1600,7 @@
                 }
 
                 // Continue buttons
-                this.continueToStep2 = document.getElementById('continueToStep2');
+                this.proceedBtn = document.getElementById('proceedBtn');
                 this.continueToStep3 = document.getElementById('continueToStep3');
                 this.processTransferBtn = document.getElementById('processTransfer');
             }
@@ -1690,7 +1692,7 @@
                     this.updateUserInfo();
 
                     // Load account data from accounts service via Kong Gateway
-                    const apiUrl = 'http://localhost:8086'; // Kong Gateway API URL
+                    const apiUrl = window.location.origin; // Use current domain/IP - Kong Gateway
                     const response = await fetch(`${apiUrl}/api/accounts`, {
                         method: 'GET',
                         headers: {
@@ -1799,7 +1801,7 @@
                         return;
                     }
 
-                    const response = await fetch('http://localhost:8086/api/payees', {
+                    const response = await fetch(`${window.location.origin}/api/payees`, {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -1942,7 +1944,7 @@
                     if (token && user?.id) {
                         try {
                             // Call backend logout API to terminate sessions
-                            const apiUrl = 'http://localhost:8086'; // Kong Gateway API URL
+                            const apiUrl = window.location.origin; // Use current domain/IP - Kong Gateway
                             
                             await fetch(`${apiUrl}/api/logout`, {
                                 method: 'POST',
@@ -2047,7 +2049,7 @@
                         throw new Error('No authentication token found');
                     }
 
-                    const response = await fetch('http://localhost:8086/api/payees', {
+                    const response = await fetch(`${window.location.origin}/api/payees`, {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -2464,7 +2466,7 @@
                     
                     // DETAILED FRONTEND REQUEST LOGGING
                     console.log('=== FRONTEND API REQUEST DEBUG ===');
-                    console.log('URL:', 'http://localhost:8086/api/payments/transfer');
+                    console.log('URL:', `${window.location.origin}/api/payments/transfer`);
                     console.log('Method:', 'POST');
                     console.log('Headers:', headers);
                     console.log('Token present:', !!token);
@@ -2475,8 +2477,8 @@
                     console.log('Timestamp:', new Date().toISOString());
                     console.log('=== END FRONTEND REQUEST DEBUG ===');
                     
-                    // Call payment-process-java-service
-                    const response = await fetch('http://localhost:8086/api/payments/transfer', {
+                    // Call payment service via Kong Gateway
+                    const response = await fetch(`${window.location.origin}/api/payments/transfer`, {
                         method: 'POST',
                         headers: headers,
                         body: pacsXml
@@ -2584,7 +2586,7 @@
                             const randomWait = 1000 + Math.random() * 600;
                             await new Promise(resolve => setTimeout(resolve, randomWait));
                             
-                            const response = await fetch(`http://localhost:8086/api/payments/status/${txnRef}`);
+                            const response = await fetch(`${window.location.origin}/api/payments/status/${txnRef}`);
                             const statusData = await response.json();
                             
                             if (response.ok) {
@@ -2776,8 +2778,8 @@
                         customerId: 'CUST001' // This should come from user session
                     };
 
-                    // Call PDF generation service
-                    const response = await fetch('http://localhost:8086/api/pdf/generate-receipt', {
+                    // Call PDF generation service via Kong Gateway
+                    const response = await fetch(`${window.location.origin}/api/pdf/generate-receipt`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -2821,22 +2823,42 @@
                 this.transferAmount = 0;
                 this.transferNote = '';
                 
-                // Clear form inputs
-                this.payeeSearch.value = '';
-                this.transferAmountInput.value = '';
-                this.transferNoteInput.value = '';
+                // Clear form inputs - check if elements exist
+                if (this.payeeSearch) {
+                    this.payeeSearch.value = '';
+                    this.payeeSearch.focus(); // Focus on payee search for immediate use
+                }
+                if (this.transferAmountInput) this.transferAmountInput.value = '';
+                if (this.transferNoteInput) this.transferNoteInput.value = '';
+                
+                // Clear payee suggestions and hide them
+                if (this.payeeSuggestions) {
+                    this.payeeSuggestions.innerHTML = '';
+                    this.hidePayeeSuggestions();
+                }
                 
                 // Clear selections
                 document.querySelectorAll('.account-option').forEach(el => el.classList.remove('selected'));
                 document.querySelectorAll('.payment-mode').forEach(el => el.classList.remove('selected'));
                 
-                // Clear PIN
-                this.pinInputs.forEach(input => input.value = '');
+                // Clear PIN - check if elements exist
+                if (this.pinInputs) {
+                    this.pinInputs.forEach(input => {
+                        if (input) input.value = '';
+                    });
+                }
                 
-                // Reset buttons (with safety checks)
-                if (this.continueToStep2) this.continueToStep2.disabled = true;
+                // Hide PIN error if visible
+                if (this.pinError) this.pinError.style.display = 'none';
+                
+                // Reset buttons with null checks
+                if (this.proceedBtn) this.proceedBtn.disabled = true;
                 if (this.continueToStep3) this.continueToStep3.disabled = true;
                 if (this.processTransferBtn) this.processTransferBtn.disabled = true;
+                
+                // Reset body background color to default
+                document.body.style.backgroundColor = '';
+                document.body.style.transition = '';
             }
 
             goToDashboard() {

@@ -23,9 +23,9 @@ const APM_CONFIG = {
     // Distributed tracing configuration
     distributedTracing: true,
     distributedTracingOrigins: [
-        'http://localhost:8086',      // Kong Gateway
-        'http://localhost:3001',      // Frontend
-        'http://localhost:5001',      // Backend services
+        window.location.origin,       // Current Kong Gateway/Frontend origin
+        'http://localhost:3001',      // Frontend fallback
+        'http://localhost:5001',      // Backend services fallback
         'http://91.203.133.240'       // APM Server domain
     ],
     
