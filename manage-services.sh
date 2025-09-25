@@ -19,6 +19,20 @@ FRONTEND_DIR="$PROJECT_DIR/frontend"
 FRONTEND_PORT=3001
 BACKEND_API_PORT=8000
 
+# APM Configuration - Export environment variables for Docker Compose
+export ELASTIC_APM_SERVER_URL=${ELASTIC_APM_SERVER_URL:-"http://91.203.133.240:30200"}
+export ELASTIC_APM_ENVIRONMENT=${ELASTIC_APM_ENVIRONMENT:-"production"}
+export ELASTIC_APM_SERVICE_VERSION=${ELASTIC_APM_SERVICE_VERSION:-"1.0.0"}
+export ELASTIC_APM_TRANSACTION_SAMPLE_RATE=${ELASTIC_APM_TRANSACTION_SAMPLE_RATE:-"1.0"}
+export ELASTIC_APM_SPAN_SAMPLE_RATE=${ELASTIC_APM_SPAN_SAMPLE_RATE:-"1.0"}
+export ELASTIC_APM_CAPTURE_BODY=${ELASTIC_APM_CAPTURE_BODY:-"all"}
+export ELASTIC_APM_CAPTURE_HEADERS=${ELASTIC_APM_CAPTURE_HEADERS:-"true"}
+export ELASTIC_APM_USE_DISTRIBUTED_TRACING=${ELASTIC_APM_USE_DISTRIBUTED_TRACING:-"true"}
+export ELASTIC_APM_LOG_LEVEL=${ELASTIC_APM_LOG_LEVEL:-"info"}
+export ELASTIC_APM_RECORDING=${ELASTIC_APM_RECORDING:-"true"}
+export ELASTIC_APM_STACK_TRACE_LIMIT=${ELASTIC_APM_STACK_TRACE_LIMIT:-"50"}
+export ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION=${ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION:-"0ms"}
+
 # Print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -54,6 +68,19 @@ check_status() {
     if ! docker compose ps >/dev/null 2>&1; then
         print_error "❌ Docker Compose not available"
         return 1
+    fi
+    
+    # Check Kong API Gateway first
+    if docker compose --profile kong ps | grep -q "vubank-kong-gateway.*Up"; then
+        print_success "✅ Kong API Gateway (8086) - Running"
+    else
+        print_error "❌ Kong API Gateway (8086) - Not Running"
+    fi
+    
+    if docker compose --profile kong ps | grep -q "kong-postgres.*Up"; then
+        print_success "✅ Kong Database (internal) - Running"
+    else
+        print_error "❌ Kong Database (internal) - Not Running"
     fi
     
     # Check individual services
@@ -113,16 +140,27 @@ check_status() {
     fi
     
     echo ""
-    echo "🔗 Service URLs:"
-    echo "   HTML Frontend:    http://localhost:8086"
-    echo "   Login API:        http://localhost:8000"
-    echo "   Auth Service:     http://localhost:8001"
-    echo "   Accounts API:     http://localhost:8002"
-    echo "   PDF Service:      http://localhost:8003"
-    echo "   Payment Service:  http://localhost:8004 (with health: /payments/health)"
-    echo "   Payee Service:    http://localhost:5004 (with health: /api/health)"
-    echo "   CoreBanking:      http://localhost:8005"
-    echo "   Database:         localhost:5432"
+    echo "🔗 Service URLs (All traffic through Kong Gateway):"
+    echo "   🌐 MAIN ENTRY POINT: http://localhost:8086"
+    echo ""
+    echo "   Frontend Pages:"
+    echo "     • Login:          http://localhost:8086/login.html"
+    echo "     • Dashboard:      http://localhost:8086/dashboard.html"
+    echo "     • Fund Transfer:  http://localhost:8086/FundTransfer.html"
+    echo ""
+    echo "   API Endpoints:"
+    echo "     • Login API:      http://localhost:8086/api/login"
+    echo "     • Logout API:     http://localhost:8086/api/logout"
+    echo "     • Accounts API:   http://localhost:8086/api/accounts"
+    echo "     • Payments API:   http://localhost:8086/api/payments"
+    echo "     • PDF API:        http://localhost:8086/api/pdf"
+    echo "     • Payees API:     http://localhost:8086/api/payees"
+    echo "     • CoreBanking:    http://localhost:8086/api/corebanking"
+    echo ""
+    echo "   Management:"
+    echo "     • Kong Admin API: http://localhost:8001"
+    echo "     • Kong Admin GUI: http://localhost:8002"
+    echo "     • Database:       localhost:5432"
     echo ""
 }
 
@@ -138,17 +176,40 @@ start_services() {
 
 # Start services with HTML container
 start_services_with_html_container() {
-    print_status "Starting services with HTML frontend container..."
+    print_status "Starting services with Kong API Gateway and HTML frontend container..."
     
-    # Build HTML container if needed
-    print_status "Building HTML frontend container..."
+    # Build HTML container with fresh build (no cache)
+    print_status "Building HTML frontend container (fresh build, no cache)..."
     cd frontend && chmod +x build-html-container.sh && ./build-html-container.sh && cd ..
     
-    # Start Docker services with HTML frontend profile
-    print_status "Starting Docker services with HTML frontend..."
-    docker compose --profile html-frontend up -d
+    # Start Kong database and migration first
+    print_status "Starting Kong database and running migrations..."
+    docker compose --profile kong up kong-postgres kong-migrations -d --build
     
-    print_success "All services started with HTML frontend container!"
+    # Wait for Kong database to be ready
+    print_status "Waiting for Kong database to be ready..."
+    sleep 10
+    
+    # Start all services with Kong and HTML frontend profiles (fresh build)
+    print_status "Starting all services with Kong API Gateway (fresh build, no cache)..."
+    docker compose --profile kong --profile html-frontend up -d --build
+    
+    # Wait for Kong to be ready and configure it automatically
+    print_status "Waiting for Kong API Gateway to be ready..."
+    sleep 15
+    
+    # Auto-configure Kong services and routes
+    print_status "Configuring Kong Gateway services and routes..."
+    if [ -f "kong/configure-kong-auto.sh" ]; then
+        ./kong/configure-kong-auto.sh
+    else
+        print_error "Kong configuration script not found!"
+    fi
+    
+    print_success "All services started with Kong API Gateway (port 8086) and HTML frontend!"
+    echo ""
+    print_status "🔗 Access your application at: http://localhost:8086"
+    echo ""
     check_status
 }
 
@@ -159,9 +220,9 @@ stop_services() {
     print_status "Stopping all services..."
     echo ""
     
-    # Stop Docker services (including HTML frontend container)
-    print_status "Stopping Docker services..."
-    docker compose --profile html-frontend down
+    # Stop Docker services (including Kong and HTML frontend containers)
+    print_status "Stopping Docker services with Kong API Gateway..."
+    docker compose --profile kong --profile html-frontend --profile frontend down --remove-orphans
     
     print_success "All services stopped!"
 }
@@ -325,6 +386,22 @@ show_help() {
     echo "  • Java CoreBanking Service (port 8005)"
     echo "  • .NET Payee Service (port 5004)"
     echo "  • HTML Frontend Container (port 8086)"
+    echo "  • Kong API Gateway (port 8086)"
+    echo ""
+    echo "Enterprise Features:"
+    echo "  ✅ Comprehensive APM monitoring with Elastic APM"
+    echo "  ✅ Distributed tracing with correlation IDs"
+    echo "  ✅ Request/Response logging with body capture"
+    echo "  ✅ Rate limiting and security policies"
+    echo "  ✅ CORS and security headers"
+    echo "  ✅ Prometheus metrics collection"
+    echo "  ✅ JWT authentication support"
+    echo ""
+    echo "APM Configuration:"
+    echo "  🔗 APM Server: ${ELASTIC_APM_SERVER_URL}"
+    echo "  🏷️  Environment: ${ELASTIC_APM_ENVIRONMENT}"
+    echo "  📊 Sample Rate: ${ELASTIC_APM_TRANSACTION_SAMPLE_RATE}"
+    echo "  📈 Tracing: ${ELASTIC_APM_USE_DISTRIBUTED_TRACING}"
     echo ""
 }
 
