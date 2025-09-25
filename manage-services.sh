@@ -431,6 +431,7 @@ health_check() {
 uninstall_services() {
     print_header
     print_warning "⚠️  WARNING: This will completely remove all VuNG Bank services, containers, images, volumes and data!"
+    print_warning "⚠️  This includes base Docker images: Kong (3.8.0) and Postgres (15)"
     print_warning "⚠️  This action cannot be undone and all data will be lost!"
     echo ""
     
@@ -482,6 +483,15 @@ uninstall_services() {
         if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "$service_image"; then
             print_status "   Removing image: $service_image"
             docker rmi -f "$service_image" 2>/dev/null || true
+        fi
+    done
+    
+    # Remove base images used by VuBank services (Kong and Postgres)
+    print_status "   Removing base Kong and Postgres images used by VuBank..."
+    for base_image in "kong:3.8.0" "postgres:15"; do
+        if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${base_image}$"; then
+            print_status "   Removing base image: $base_image"
+            docker rmi -f "$base_image" 2>/dev/null || true
         fi
     done
     
@@ -619,7 +629,7 @@ show_help() {
     echo "  stop      - Stop all services"
     echo "  restart   - Restart all services"
     echo "  install   - Install dependencies and setup"
-    echo "  uninstall - Complete removal of all services, containers, images and volumes"
+    echo "  uninstall - Complete removal: services, containers, images (including Kong/Postgres), volumes"
     echo "  clean-cache - Clean Docker build cache and force fresh builds"
     echo "  apm-config - Show centralized APM configuration for all services"
     echo "  logs      - Show service logs"
@@ -631,7 +641,7 @@ show_help() {
     echo "  ./manage-services.sh status                   # Check service status"
     echo "  ./manage-services.sh apm-config               # Show centralized APM configuration"
     echo "  ./manage-services.sh restart                  # Restart all services"
-    echo "  ./manage-services.sh uninstall                # Remove everything (containers, images, volumes)"
+    echo "  ./manage-services.sh uninstall                # Remove everything (including Kong/Postgres base images)"
     echo "  ./manage-services.sh clean-cache              # Clean Docker cache for fresh builds"
     echo ""
     echo "Services managed:"
