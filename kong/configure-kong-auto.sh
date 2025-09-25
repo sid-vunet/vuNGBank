@@ -74,13 +74,15 @@ create_route() {
         return 1
     fi
     
-    # Delete existing routes for this service first (to avoid duplicates)
+    # Delete existing routes for this service with the same path (to avoid duplicates)
     existing_routes=$(curl -s "$KONG_ADMIN_URL/services/$service_name/routes" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
+    target_path = '$path'
     for route in data.get('data', []):
-        print(route['id'])
+        if target_path in route.get('paths', []):
+            print(route['id'])
 except:
     pass
 " 2>/dev/null || true)
