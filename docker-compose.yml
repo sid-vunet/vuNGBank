@@ -94,7 +94,7 @@ services:
     ports:
       - "8086:8086"  # Main API Gateway Port
       - "8001:8001"  # Kong Admin API
-      - "8002:8002"  # Kong Admin GUI
+      - "8443:8002"  # Kong Admin GUI
     depends_on:
       kong-migrations:
         condition: service_completed_successfully

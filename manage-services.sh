@@ -33,6 +33,196 @@ export ELASTIC_APM_RECORDING=${ELASTIC_APM_RECORDING:-"true"}
 export ELASTIC_APM_STACK_TRACE_LIMIT=${ELASTIC_APM_STACK_TRACE_LIMIT:-"50"}
 export ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION=${ELASTIC_APM_SPAN_STACK_TRACE_MIN_DURATION:-"0ms"}
 
+# Kong container health check
+check_kong_container_health() {
+    local container_name="vubank-kong-gateway"
+    local max_wait=60
+    local wait_time=0
+    
+    print_status "Checking Kong container health..."
+    
+    while [ $wait_time -lt $max_wait ]; do
+        local container_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "not_found")
+        
+        case "$container_status" in
+            "healthy")
+                print_success "Kong container is healthy"
+                return 0
+                ;;
+            "unhealthy")
+                print_warning "Kong container is unhealthy, attempting restart..."
+                restart_kong_container
+                return $?
+                ;;
+            "starting")
+                print_status "Kong container is starting... ($wait_time/$max_wait seconds)"
+                ;;
+            "not_found")
+                print_warning "Kong container not found, starting it..."
+                start_kong_container
+                return $?
+                ;;
+        esac
+        
+        sleep 5
+        wait_time=$((wait_time + 5))
+    done
+    
+    print_error "Kong container health check timed out after $max_wait seconds"
+    return 1
+}
+
+# Start Kong container if not running
+start_kong_container() {
+    print_status "Starting Kong Gateway container..."
+    
+    if docker compose --profile kong up vubank-kong-gateway -d; then
+        print_success "Kong container started successfully"
+        sleep 10  # Give Kong time to initialize
+        return 0
+    else
+        print_error "Failed to start Kong container"
+        return 1
+    fi
+}
+
+# Restart Kong container
+restart_kong_container() {
+    print_status "Restarting Kong Gateway container..."
+    
+    docker compose --profile kong stop vubank-kong-gateway
+    sleep 5
+    
+    if docker compose --profile kong up vubank-kong-gateway -d; then
+        print_success "Kong container restarted successfully"
+        sleep 15  # Give Kong more time to fully initialize after restart
+        return 0
+    else
+        print_error "Failed to restart Kong container"
+        return 1
+    fi
+}
+
+# Configure Kong services and routes with validation and auto-recovery
+configure_kong_services() {
+    local max_retries=10
+    local retry_count=0
+    
+    print_status "Configuring Kong Gateway services and routes..."
+    
+    # First, ensure Kong container is healthy
+    if ! check_kong_container_health; then
+        print_error "Kong container health check failed"
+        return 1
+    fi
+    
+    # Check if Kong configuration script exists
+    if [ ! -f "kong/configure-kong-auto.sh" ]; then
+        print_error "Kong configuration script not found at kong/configure-kong-auto.sh!"
+        return 1
+    fi
+    
+    # Make sure the script is executable
+    chmod +x kong/configure-kong-auto.sh
+    
+    # Wait for Kong Admin API to be available with extended retries
+    print_status "Waiting for Kong Admin API to be available..."
+    while [ $retry_count -lt $max_retries ]; do
+        if curl -s "http://localhost:8001" > /dev/null 2>&1; then
+            print_success "Kong Admin API is ready"
+            break
+        fi
+        
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -eq $max_retries ]; then
+            print_error "Kong Admin API not available after $max_retries attempts"
+            print_status "Attempting Kong container restart..."
+            if restart_kong_container; then
+                print_status "Retrying Kong configuration after restart..."
+                configure_kong_services  # Recursive call after restart
+                return $?
+            else
+                return 1
+            fi
+        fi
+        
+        print_status "Waiting for Kong Admin API... (attempt $retry_count/$max_retries)"
+        sleep 10
+    done
+    
+    # Execute Kong configuration script
+    print_status "Executing Kong configuration script..."
+    if ./kong/configure-kong-auto.sh; then
+        print_success "Kong Gateway services and routes configured successfully!"
+        
+        # Validate configuration
+        validate_kong_configuration
+    else
+        print_error "Kong configuration script failed!"
+        return 1
+    fi
+}
+
+# Validate Kong configuration with comprehensive checks
+validate_kong_configuration() {
+    print_status "Validating Kong configuration..."
+    
+    # Check services count
+    local services_count=$(curl -s "http://localhost:8001/services" 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)['data']))" 2>/dev/null || echo "0")
+    
+    # Check routes count  
+    local routes_count=$(curl -s "http://localhost:8001/routes" 2>/dev/null | python3 -c "import sys,json; print(len(json.load(sys.stdin)['data']))" 2>/dev/null || echo "0")
+    
+    if [ "$services_count" -gt "0" ] && [ "$routes_count" -gt "0" ]; then
+        print_success "Kong configuration validated: $services_count services, $routes_count routes"
+        
+        # Test critical endpoints
+        local endpoint_tests=0
+        local endpoint_passes=0
+        
+        # Test main gateway health
+        endpoint_tests=$((endpoint_tests + 1))
+        if curl -s "http://localhost:8086/health" > /dev/null 2>&1; then
+            endpoint_passes=$((endpoint_passes + 1))
+            print_success "✅ Main gateway health endpoint working"
+        else
+            print_warning "❌ Main gateway health endpoint failed"
+        fi
+        
+        # Test Kong Admin API through gateway
+        endpoint_tests=$((endpoint_tests + 1))
+        if curl -s "http://localhost:8086/kong/api" > /dev/null 2>&1; then
+            endpoint_passes=$((endpoint_passes + 1))
+            print_success "✅ Kong Admin API through gateway working"
+        else
+            print_warning "❌ Kong Admin API through gateway failed"
+        fi
+        
+        # Test frontend route
+        endpoint_tests=$((endpoint_tests + 1))
+        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8086/" | grep -q "200\|301\|302"; then
+            endpoint_passes=$((endpoint_passes + 1))
+            print_success "✅ Frontend route working"
+        else
+            print_warning "❌ Frontend route failed"
+        fi
+        
+        # Summary
+        print_status "Endpoint validation: $endpoint_passes/$endpoint_tests tests passed"
+        
+        if [ "$endpoint_passes" -ge 2 ]; then
+            print_success "Kong Gateway validation passed with $endpoint_passes/$endpoint_tests endpoints working"
+            return 0
+        else
+            print_warning "Kong Gateway partially working: $endpoint_passes/$endpoint_tests endpoints functional"
+            return 1
+        fi
+    else
+        print_error "Kong configuration validation failed: $services_count services, $routes_count routes"
+        return 1
+    fi
+}
+
 # Print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -73,6 +263,19 @@ check_status() {
     # Check Kong API Gateway first
     if docker compose --profile kong ps | grep -q "vubank-kong-gateway.*Up"; then
         print_success "✅ Kong API Gateway (8086) - Running"
+        
+        # Additional Kong health check
+        if curl -s "http://localhost:8001" > /dev/null 2>&1; then
+            print_success "✅ Kong Admin API (8001) - Accessible"
+        else
+            print_warning "⚠️  Kong Admin API (8001) - Not Responding"
+        fi
+        
+        if curl -s "http://localhost:8086/health" > /dev/null 2>&1; then
+            print_success "✅ Kong Gateway Health Check - Passing"
+        else
+            print_warning "⚠️  Kong Gateway Health Check - Failing"
+        fi
     else
         print_error "❌ Kong API Gateway (8086) - Not Running"
     fi
@@ -194,16 +397,17 @@ start_services_with_html_container() {
     print_status "Starting all services with Kong API Gateway (fresh build, no cache)..."
     docker compose --profile kong --profile html-frontend up -d --build
     
-    # Wait for Kong to be ready and configure it automatically
+    # Wait for Kong to be ready and configure it automatically with validation
     print_status "Waiting for Kong API Gateway to be ready..."
     sleep 15
     
-    # Auto-configure Kong services and routes
-    print_status "Configuring Kong Gateway services and routes..."
-    if [ -f "kong/configure-kong-auto.sh" ]; then
-        ./kong/configure-kong-auto.sh
+    # Auto-configure Kong services and routes with health checks
+    print_status "Configuring Kong Gateway services and routes with validation..."
+    if configure_kong_services; then
+        print_success "Kong Gateway fully configured and validated!"
     else
-        print_error "Kong configuration script not found!"
+        print_error "Kong Gateway configuration failed, but continuing..."
+        print_status "You can manually reconfigure Kong later using: ./manage-services.sh configure"
     fi
     
     print_success "All services started with Kong API Gateway (port 8086) and HTML frontend!"
@@ -235,7 +439,11 @@ restart_services() {
     
     stop_services
     sleep 5
-    start_services "$1" "$2"
+    start_services
+    
+    # Additional Kong configuration after restart
+    print_status "Re-configuring Kong after restart..."
+    configure_kong_services
 }
 
 # Install dependencies
@@ -362,19 +570,21 @@ show_help() {
     echo "Usage: ./manage-services.sh [command]"
     echo ""
     echo "Commands:"
-    echo "  status    - Check status of all services"
-    echo "  start     - Start all services with HTML frontend container"
-    echo "  stop      - Stop all services"
-    echo "  restart   - Restart all services"
-    echo "  install   - Install dependencies and setup"
-    echo "  logs      - Show service logs"
-    echo "  health    - Run health checks"
-    echo "  help      - Show this help message"
+    echo "  status       - Check status of all services"
+    echo "  start        - Start all services with HTML frontend container"
+    echo "  stop         - Stop all services"
+    echo "  restart      - Restart all services"
+    echo "  install      - Install dependencies and setup"
+    echo "  logs         - Show service logs"
+    echo "  health       - Run health checks"
+    echo "  configure    - Configure Kong Gateway services and routes"
+    echo "  help         - Show this help message"
     echo ""
     echo "Examples:"
     echo "  ./manage-services.sh start                    # Start all services"
     echo "  ./manage-services.sh status                   # Check service status"
     echo "  ./manage-services.sh restart                  # Restart all services"
+    echo "  ./manage-services.sh configure                # Re-configure Kong Gateway"
     echo ""
     echo "Services managed:"
     echo "  • PostgreSQL Database (port 5432)"
@@ -417,7 +627,7 @@ case "${1:-help}" in
         stop_services
         ;;
     "restart")
-        restart_services "$1" "$2"
+        restart_services
         ;;
     "install")
         install_dependencies
@@ -427,6 +637,11 @@ case "${1:-help}" in
         ;;
     "health")
         health_check
+        ;;
+    "configure")
+        print_header
+        print_status "Manual Kong Gateway configuration..."
+        configure_kong_services
         ;;
     "help"|"")
         show_help

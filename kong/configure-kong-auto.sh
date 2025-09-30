@@ -255,6 +255,10 @@ create_or_update_service "payee-store-dotnet-service" "http://payee-store-dotnet
 create_or_update_service "pdf-receipt-java-service" "http://pdf-receipt-java-service:8003"
 create_or_update_service "frontend-service" "http://vubank-html-frontend:80"
 
+# Configure Kong Admin services (internal routing within same container)
+create_or_update_service "kong-admin-api" "http://localhost:8001"
+create_or_update_service "kong-admin-gui" "http://localhost:8002"
+
 echo "🛣️  Configuring Kong routes..."
 
 # Configure API routes
@@ -266,6 +270,22 @@ create_route "corebanking-java-service" "/api/corebanking"
 create_strip_route "payment-process-java-service" "/api/payments"
 create_route "payee-store-dotnet-service" "/api/payees"
 create_route "pdf-receipt-java-service" "/api/pdf"
+
+# Configure Kong Admin routes
+create_strip_route "kong-admin-api" "/kong/api"
+
+# Kong Admin GUI has resource loading issues when served through proxy paths
+# The GUI expects to be served from root and loads resources with absolute paths
+echo "⚠️  Kong Admin GUI resource loading limitations detected"
+echo "📍 For full functionality, use direct access:"
+echo "    • Admin GUI (Direct): http://localhost:8002"
+echo "    • Admin GUI (External): http://91.203.133.240:8002"
+
+# Still create a basic GUI route for reference, but with known limitations
+echo "🎛️  Creating basic Kong Admin GUI route (limited functionality)"
+create_strip_route "kong-admin-gui" "/kong/gui"
+
+
 
 # Configure frontend routes (root and specific HTML pages)
 create_frontend_route "frontend-service" "/"
@@ -307,8 +327,13 @@ echo "  ✨ All pages now use window.location.origin for API calls"
 echo "  ✨ Works with any domain/IP: 91.203.133.240:8086, localhost:8086, etc."
 echo ""
 echo "🛠️  Kong Management:"
-echo "  📡 Admin API:      http://localhost:8001"
-echo "  🎛️  Admin GUI:      http://localhost:8002"
+echo "  📡 Admin API (Direct):    http://localhost:8001"
+echo "  📡 Admin API (via Kong):  http://localhost:8086/kong/api"
+echo "  🎛️  Admin GUI (Direct):    http://localhost:8002 ⭐ RECOMMENDED"
+echo "  🎛️  Admin GUI (External):  http://91.203.133.240:8002 ⭐ RECOMMENDED"
+echo ""
+echo "  ⚠️  Note: /kong/gui route has limited functionality due to resource loading issues"
+echo "  ✅ For full Kong Manager features, use direct access on port 8002"
 
 # Test a simple endpoint
 echo ""
