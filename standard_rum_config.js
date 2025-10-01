@@ -1,28 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="VuBank NextGen Banking Platform"
-    />
-    <!-- Preload Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Elastic RUM Agent -->
-    <script src="%PUBLIC_URL%/elastic-apm-rum.js" crossorigin></script>
-    <script>
-                        // Initialize Elastic RUM with MAXIMUM automatic data capture
-        // =======================================
-        // STANDARD VUBANK RUM CONFIGURATION
-        // =======================================
-
-        // ========================================
+// ========================================
 // STANDARD VUBANK RUM CONFIGURATION
 // ========================================
 // This is the unified RUM configuration used across all HTML files
@@ -87,7 +63,7 @@ window.elasticApm = elasticApm.init({
     // === PAGE LOAD ===
     capturePageLoad: true,
     capturePageLoadSpans: true,
-    pageLoadTransactionName: 'vubank-public-index-page-load', // TO BE REPLACED
+    pageLoadTransactionName: 'PAGE_SPECIFIC_TRANSACTION_NAME', // TO BE REPLACED
     pageLoadSpanId: true,
     
     // === USER INTERACTIONS ===
@@ -164,45 +140,3 @@ window.elasticApm = elasticApm.init({
     browserHistory: true,
     active: true
 });
-
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="VuBank NextGen Banking Platform"
-    />
-    <!-- Preload Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Elastic RUM Agent -->
-    <script src="%PUBLIC_URL%/elastic-apm-rum.js" crossorigin></script>
-    <script>
-                        // Initialize Elastic RUM with MAXIMUM automatic data capture
-    </script>
-    
-    <!-- Prevent FOUC (Flash of Unstyled Content) -->
-    <style>
-      body {
-        margin: 0;
-        background: linear-gradient(135deg, #003d82 0%, #0066cc 50%, #4da6ff 100%);
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        min-height: 100vh;
-      }
-      #root {
-        min-height: 100vh;
-      }
-    </style>
-    <title>Welcome to VuBank Straight2Bank</title>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
-</html>

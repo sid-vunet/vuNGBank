@@ -14,16 +14,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Elastic RUM Agent -->
-        <!-- Elastic APM RUM Agent -->
-    <script src="/elastic-apm-rum.js"></script>
+    <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
-        // Ensure elasticApm is available
-        if (typeof elasticApm === 'undefined') {
-            console.error('❌ Elastic APM RUM library failed to load');
-        } else {
-            console.log('✅ Elastic APM RUM library loaded successfully');
-        }
-
         // Initialize Elastic RUM with MAXIMUM automatic data capture
         // Detect environment from URL/hostname
         const getAPMEnvironment = () => {
@@ -37,8 +29,7 @@
             }
         };
 
-        try {
-            window.elasticApm = elasticApm.init({
+        window.elasticApm = elasticApm.init({
             // === CORE CONFIGURATION ===
             serviceName: 'vubank-frontend',
             serverUrl: 'http://91.203.133.240:30200',
@@ -181,25 +172,16 @@
             active: true
         });
         
-        } catch (error) {
-            console.error('❌ Failed to initialize Elastic APM RUM:', error);
-            console.log('🔧 RUM initialization failed - continuing without monitoring');
-        }
-        
         // Debug RUM status
         window.addEventListener('load', function() {
             setTimeout(() => {
-                if (typeof window.elasticApm !== 'undefined' && window.elasticApm) {
+                if (typeof window.elasticApm !== 'undefined') {
                     console.log('✅ Elastic RUM is loaded and active');
-                    console.log('📊 RUM Service Name:', window.elasticApm.getServiceName ? window.elasticApm.getServiceName() : 'Method not available');
-                    console.log('🔗 RUM Server URL:', 'http://91.203.133.240:30200');
-                    console.log('👆 User Interactions Enabled:', 'true');
-                    console.log('🎯 RUM Agent Type:', typeof window.elasticApm);
-                    console.log('🔍 RUM Agent Object:', window.elasticApm);
+                    console.log('📊 RUM Service Name:', window.elasticApm._config?.serviceName);
+                    console.log('🔗 RUM Server URL:', window.elasticApm._config?.serverUrl);
+                    console.log('👆 User Interactions Enabled:', window.elasticApm._config?.captureUserInteractions);
                 } else {
                     console.error('❌ Elastic RUM is not loaded!');
-                    console.log('🔍 elasticApm type:', typeof elasticApm);
-                    console.log('🔍 window.elasticApm type:', typeof window.elasticApm);
                 }
             }, 1000);
         });

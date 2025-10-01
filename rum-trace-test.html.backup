@@ -53,209 +53,44 @@
         let apm;
         
         try {
-        // =======================================
-        // STANDARD VUBANK RUM CONFIGURATION
-        // =======================================
-
-        // ========================================
-// STANDARD VUBANK RUM CONFIGURATION
-// ========================================
-// This is the unified RUM configuration used across all HTML files
-// Only pageLoadTransactionName should be customized per page
-
-window.elasticApm = elasticApm.init({
-    // === CORE CONFIGURATION ===
-    serviceName: 'vubank-frontend',
-    serverUrl: 'http://91.203.133.240:30200',
-    serviceVersion: '1.0.0',
-    environment: 'e2e-240-dev',
-    
-    // === DISTRIBUTED TRACING ===
-    distributedTracing: true,
-    distributedTracingOrigins: [
-        // Current page origin
-        window.location.origin,
-        
-        // Frontend endpoints
-        'http://localhost:3001',
-        'http://localhost:3000',
-        
-        // Backend microservices
-        'http://login-go-service:8000',
-        'http://login-python-authenticator:8001', 
-        'http://accounts-go-service:8002',
-        'http://pdf-receipt-java-service:8003',
-        'http://payment-process-java-service:8004',
-        'http://corebanking-java-service:8005',
-        'http://payee-store-dotnet-service:5004',
-        
-        // Local development endpoints
-        'http://localhost:8000',
-        'http://localhost:8001',
-        'http://localhost:8002', 
-        'http://localhost:8003',
-        'http://localhost:8004',
-        'http://localhost:8005',
-        'http://localhost:5004',
-        
-        // APM server endpoints
-        'http://91.203.133.240:30200',
-        'http://apm-server:30200',
-        'https://91.203.133.240:30200',
-        'https://apm-server:30200',
-        
-        // Docker compose service names
-        'http://vubank-frontend:3000',
-        'http://vubank-html-frontend:80',
-        
-        // Catch-all
-        '*'
-    ],
-    
-    // === INSTRUMENTATION ===
-    disableInstrumentations: [],
-    instrumentFetch: true,
-    instrumentXMLHttpRequest: true,
-    captureHeaders: true,
-    captureBody: 'all',
-    
-    // === PAGE LOAD ===
-    capturePageLoad: true,
-    capturePageLoadSpans: true,
-    pageLoadTransactionName: 'vubank-rum-trace-test-page-load', // TO BE REPLACED
-    pageLoadSpanId: true,
-    
-    // === USER INTERACTIONS ===
-    captureUserInteractions: true,
-    userInteractionTimeout: 5000,
-    
-    // === NAVIGATION ===
-    captureNavigation: true,
-    
-    // === ERROR CAPTURE ===
-    captureErrors: true,
-    errorThrottleLimit: 200,
-    errorThrottleInterval: 30000,
-    captureUnhandledRejections: true,
-    
-    // === PERFORMANCE ===
-    transactionSampleRate: 1.0,
-    spanSampleRate: 1.0,
-    transactionTimeout: 30000,
-    captureResourceTimings: true,
-    breakdownMetrics: true,
-    
-    // === SESSION ===
-    session: true,
-    sessionTimeout: 1800000, // 30 minutes
-    
-    // === SPAN CONFIGURATION ===
-    spanStackTraceMinDuration: 0,
-    spanCompressionEnabled: false,
-    captureSpanStackTraces: true,
-    
-    // === LOGGING ===
-    logLevel: 'debug',
-    sendCredentials: false,
-    
-    // === METADATA ===
-    sourcemapsEnabled: true,
-    propagateTracestate: true,
-    
-    // === CONTEXT ===
-    context: {
-        user: {
-            id: 'auto-detected',
-            username: 'auto-detected', 
-            email: 'auto-detected'
-        },
-        custom: {
-            application: 'vubank-frontend',
-            version: '1.0.0'
-        }
-    },
-    
-    // === LONG TASK MONITORING ===
-    longTask: {
-        threshold: 50
-    },
-    
-    // === CENTRAL CONFIGURATION ===
-    centralConfig: true,
-    
-    // === PERFORMANCE ===
-    memoryLimit: 10485760, // 10MB
-    queueLimit: 1000,
-    flushInterval: 500,
-    
-    // === EXPERIMENTAL ===
-    experimental: {
-        asyncStack: true
-    },
-    
-    // === ADVANCED ===
-    apiRequestTime: true,
-    apiRequestSize: true,
-    browserHistory: true,
-    active: true
-});
-
-<!DOCTYPE html>
-<html>
-<head>
-    <title>RUM Trace Propagation Test</title>
-    <script src="https://unpkg.com/@elastic/apm-rum@5.12.1/dist/bundles/elastic-apm-rum.umd.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .test-section { margin: 20px 0; padding: 20px; background: #f5f5f5; border-radius: 5px; }
-        .result { margin: 10px 0; padding: 10px; border-radius: 3px; }
-        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
-        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
-        pre { background: white; padding: 10px; border: 1px solid #ddd; overflow: auto; }
-    </style>
-</head>
-<body>
-    <h1>🔍 RUM to Payment Service Trace Propagation Test</h1>
-    
-    <div class="test-section">
-        <h3>1. RUM Agent Status</h3>
-        <div id="rum-status" class="result info">Initializing...</div>
-        <button onclick="checkRumStatus()">Check RUM Agent</button>
-    </div>
-
-    <div class="test-section">
-        <h3>2. Test Trace Propagation</h3>
-        <div id="trace-test-result" class="result info">Ready to test</div>
-        <button onclick="testTraceToPaymentService()">Send Traced Payment Request</button>
-        <button onclick="checkCurrentTransaction()">Check Current Transaction</button>
-    </div>
-
-    <div class="test-section">
-        <h3>3. Transaction Details</h3>
-        <pre id="transaction-details">Click "Check Current Transaction" to see active transaction details</pre>
-    </div>
-
-    <div class="test-section">
-        <h3>4. Test Results</h3>
-        <div id="final-results" class="result info">
-            This test will verify that:
-            <ul>
-                <li>RUM agent is properly initialized</li>
-                <li>HTTP requests include trace headers (traceparent, tracestate)</li>
-                <li>Payment service receives and continues the trace</li>
-                <li>End-to-end transaction processing works</li>
-            </ul>
-        </div>
-    </div>
-
-    <script>
-        // Initialize RUM agent with same config as main app
-        let apm;
-        
-        try {
-            document.getElementById('rum-status').innerHTML = '<strong>✅ RUM Agent Initialized Successfully</strong>';
+        apm = elasticApm.init({
+            serviceName: 'vubank-frontend',
+            serverUrl: 'http://91.203.133.240:30200',
+            environment: 'e2e-240-dev',
+            
+            // Enable distributed tracing
+            distributedTracing: true,
+            distributedTracingOrigins: [
+                'http://localhost:8000',
+                'http://localhost:8001', 
+                'http://localhost:8002',
+                'http://localhost:8003',
+                'http://localhost:8004',
+                'http://localhost:8005',
+                'http://91.203.133.240:30200',
+                'http://apm-server:30200',
+                'https://91.203.133.240:30200',
+                'https://apm-server:30200',
+                window.location.origin
+            ],
+            
+            // Enable all monitoring features
+            active: true,
+            logLevel: 'debug',
+            
+            // Capture everything
+            capturePageLoad: true,
+            capturePageLoadSpans: true,
+            captureUserInteractions: true,
+            captureErrors: true,
+            
+            // Sample rates
+            transactionSampleRate: 1.0,
+            spanSampleRate: 1.0,
+            
+            // Page load transaction
+            pageLoadTransactionName: 'rum-trace-test-page-load'
+        });            document.getElementById('rum-status').innerHTML = '<strong>✅ RUM Agent Initialized Successfully</strong>';
             document.getElementById('rum-status').className = 'result success';
         } catch (error) {
             document.getElementById('rum-status').innerHTML = '<strong>❌ RUM Agent Failed to Initialize:</strong><br>' + error.message;

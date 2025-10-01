@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Login JS Syntax</title>
+</head>
+<body>
+    <h1>Testing Login Page JavaScript Syntax</h1>
+    <div id="result"></div>
+    
+    <script>
+        fetch('http://91.203.133.240:8086/login.html')
+            .then(response => response.text())
+            .then(html => {
+                // Extract the script content from the login page
+                const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+                if (scriptMatch) {
+                    const scriptContent = scriptMatch[1];
+                    console.log('Testing JavaScript from login.html...');
+                    
+                    try {
+                        // Create a function to test the syntax
+                        new Function(scriptContent);
+                        document.getElementById('result').innerHTML = '<p style="color: green;">✅ JavaScript syntax is valid!</p>';
+                        console.log('✅ JavaScript syntax is valid!');
+                    } catch (error) {
+                        document.getElementById('result').innerHTML = '<p style="color: red;">❌ JavaScript syntax error: ' + error.message + '</p>';
+                        console.error('❌ JavaScript syntax error:', error);
+                    }
+                } else {
+                    document.getElementById('result').innerHTML = '<p style="color: orange;">⚠️ No script tag found</p>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('result').innerHTML = '<p style="color: red;">❌ Failed to fetch login.html: ' + error.message + '</p>';
+                console.error('❌ Failed to fetch login.html:', error);
+            });
+    </script>
+</body>
+</html>

@@ -71,226 +71,44 @@
 
         // Initialize RUM agent
         try {
-        // =======================================
-        // STANDARD VUBANK RUM CONFIGURATION
-        // =======================================
-
-        // ========================================
-// STANDARD VUBANK RUM CONFIGURATION
-// ========================================
-// This is the unified RUM configuration used across all HTML files
-// Only pageLoadTransactionName should be customized per page
-
-window.elasticApm = elasticApm.init({
-    // === CORE CONFIGURATION ===
-    serviceName: 'vubank-frontend',
-    serverUrl: 'http://91.203.133.240:30200',
-    serviceVersion: '1.0.0',
-    environment: 'e2e-240-dev',
-    
-    // === DISTRIBUTED TRACING ===
-    distributedTracing: true,
-    distributedTracingOrigins: [
-        // Current page origin
-        window.location.origin,
-        
-        // Frontend endpoints
-        'http://localhost:3001',
-        'http://localhost:3000',
-        
-        // Backend microservices
-        'http://login-go-service:8000',
-        'http://login-python-authenticator:8001', 
-        'http://accounts-go-service:8002',
-        'http://pdf-receipt-java-service:8003',
-        'http://payment-process-java-service:8004',
-        'http://corebanking-java-service:8005',
-        'http://payee-store-dotnet-service:5004',
-        
-        // Local development endpoints
-        'http://localhost:8000',
-        'http://localhost:8001',
-        'http://localhost:8002', 
-        'http://localhost:8003',
-        'http://localhost:8004',
-        'http://localhost:8005',
-        'http://localhost:5004',
-        
-        // APM server endpoints
-        'http://91.203.133.240:30200',
-        'http://apm-server:30200',
-        'https://91.203.133.240:30200',
-        'https://apm-server:30200',
-        
-        // Docker compose service names
-        'http://vubank-frontend:3000',
-        'http://vubank-html-frontend:80',
-        
-        // Catch-all
-        '*'
-    ],
-    
-    // === INSTRUMENTATION ===
-    disableInstrumentations: [],
-    instrumentFetch: true,
-    instrumentXMLHttpRequest: true,
-    captureHeaders: true,
-    captureBody: 'all',
-    
-    // === PAGE LOAD ===
-    capturePageLoad: true,
-    capturePageLoadSpans: true,
-    pageLoadTransactionName: 'vubank-rum-login-test-page-load', // TO BE REPLACED
-    pageLoadSpanId: true,
-    
-    // === USER INTERACTIONS ===
-    captureUserInteractions: true,
-    userInteractionTimeout: 5000,
-    
-    // === NAVIGATION ===
-    captureNavigation: true,
-    
-    // === ERROR CAPTURE ===
-    captureErrors: true,
-    errorThrottleLimit: 200,
-    errorThrottleInterval: 30000,
-    captureUnhandledRejections: true,
-    
-    // === PERFORMANCE ===
-    transactionSampleRate: 1.0,
-    spanSampleRate: 1.0,
-    transactionTimeout: 30000,
-    captureResourceTimings: true,
-    breakdownMetrics: true,
-    
-    // === SESSION ===
-    session: true,
-    sessionTimeout: 1800000, // 30 minutes
-    
-    // === SPAN CONFIGURATION ===
-    spanStackTraceMinDuration: 0,
-    spanCompressionEnabled: false,
-    captureSpanStackTraces: true,
-    
-    // === LOGGING ===
-    logLevel: 'debug',
-    sendCredentials: false,
-    
-    // === METADATA ===
-    sourcemapsEnabled: true,
-    propagateTracestate: true,
-    
-    // === CONTEXT ===
-    context: {
-        user: {
-            id: 'auto-detected',
-            username: 'auto-detected', 
-            email: 'auto-detected'
-        },
-        custom: {
-            application: 'vubank-frontend',
-            version: '1.0.0'
-        }
-    },
-    
-    // === LONG TASK MONITORING ===
-    longTask: {
-        threshold: 50
-    },
-    
-    // === CENTRAL CONFIGURATION ===
-    centralConfig: true,
-    
-    // === PERFORMANCE ===
-    memoryLimit: 10485760, // 10MB
-    queueLimit: 1000,
-    flushInterval: 500,
-    
-    // === EXPERIMENTAL ===
-    experimental: {
-        asyncStack: true
-    },
-    
-    // === ADVANCED ===
-    apiRequestTime: true,
-    apiRequestSize: true,
-    browserHistory: true,
-    active: true
-});
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>RUM Login Transaction Test</title>
-    <script src="https://unpkg.com/@elastic/apm-rum@5.12.1/dist/bundles/elastic-apm-rum.umd.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .section { margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
-        .result { margin: 15px 0; padding: 15px; border-radius: 5px; }
-        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
-        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
-        button { padding: 12px 24px; margin: 8px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #6c757d; cursor: not-allowed; }
-        input[type="text"], input[type="password"] { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
-        pre { background: white; padding: 15px; border: 1px solid #ddd; overflow: auto; font-size: 12px; }
-        .transaction-info { background: #e7f3ff; padding: 10px; border-left: 4px solid #007bff; margin: 10px 0; }
-    </style>
-</head>
-<body>
-    <h1>🔍 RUM Login Transaction Test</h1>
-    <p>This page will generate <strong>real RUM login transactions</strong> that you can see in the APM Dashboard.</p>
-
-    <div class="section">
-        <h3>1. RUM Agent Status</h3>
-        <div id="rum-status" class="result info">Initializing RUM agent...</div>
-        <button onclick="checkRumStatus()">Check RUM Status</button>
-    </div>
-
-    <div class="section">
-        <h3>2. Login Form (Creates RUM Transaction)</h3>
-        <div>
-            <input type="text" id="username" placeholder="Username (try: sidharth)" value="sidharth">
-            <input type="password" id="password" placeholder="Password (try: password123)" value="password123">
-            <br>
-            <button onclick="performRumLogin()">🚀 Login with RUM Transaction</button>
-            <button onclick="startManualTransaction()">📊 Start Manual Transaction</button>
-        </div>
-        <div id="login-result" class="result info">Ready to test RUM login transaction</div>
-    </div>
-
-    <div class="section">
-        <h3>3. Current Transaction Info</h3>
-        <div class="transaction-info">
-            <strong>Active Transaction:</strong>
-            <pre id="transaction-details">No active transaction</pre>
-        </div>
-        <button onclick="checkCurrentTransaction()">Check Current Transaction</button>
-        <button onclick="endCurrentTransaction()">End Current Transaction</button>
-    </div>
-
-    <div class="section">
-        <h3>4. APM Dashboard Instructions</h3>
-        <div class="result warning">
-            <h4>How to see your RUM login transactions:</h4>
-            <ol>
-                <li><strong>Open APM Dashboard:</strong> <a href="http://91.203.133.240:30200" target="_blank">http://91.203.133.240:30200</a></li>
-                <li><strong>Look for service:</strong> <code>vubank-frontend</code></li>
-                <li><strong>Filter by transaction type:</strong> <code>user-login</code> or <code>user-interaction</code></li>
-                <li><strong>Check time range:</strong> Last 15 minutes</li>
-                <li><strong>Look for distributed traces</strong> connecting frontend → login service</li>
-            </ol>
-        </div>
-    </div>
-
-    <script>
-        let apm;
-        let currentTransaction = null;
-
-        // Initialize RUM agent
-        try {
+            apm = elasticApm.init({
+                serviceName: 'vubank-frontend',
+                serverUrl: 'http://91.203.133.240:30200',
+                environment: 'e2e-240-dev',
+                
+                // Enable distributed tracing
+                distributedTracing: true,
+                distributedTracingOrigins: [
+                    'http://localhost:8000',
+                    'http://localhost:8001', 
+                    'http://localhost:8002',
+                    'http://localhost:8003',
+                    'http://localhost:8004',
+                    'http://localhost:8005',
+                    'http://91.203.133.240:30200',
+                    'http://apm-server:30200',
+                    'https://91.203.133.240:30200',
+                    'https://apm-server:30200',
+                    window.location.origin
+                ],
+                
+                // Enable all monitoring features
+                active: true,
+                logLevel: 'debug',
+                
+                // Capture everything
+                capturePageLoad: true,
+                capturePageLoadSpans: true,
+                captureUserInteractions: true,
+                captureErrors: true,
+                
+                // Sample rates
+                transactionSampleRate: 1.0,
+                spanSampleRate: 1.0,
+                
+                // Page load transaction
+                pageLoadTransactionName: 'rum-login-test-page-load'
+            });
 
             document.getElementById('rum-status').innerHTML = '<strong>✅ RUM Agent Initialized Successfully!</strong><br>Service: vubank-frontend<br>Server: http://91.203.133.240:30200';
             document.getElementById('rum-status').className = 'result success';

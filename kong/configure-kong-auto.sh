@@ -2,6 +2,20 @@
 
 # Kong Gateway Configuration Script for VuNG Bank
 # This script configures Kong services and routes automatically during startup
+#
+# CRITICAL ROUTES FOR APM MONITORING:
+# - /elastic-apm-rum.js: Required for Elastic APM RUM library (frontend monitoring)
+# - /login.html: Login page must be accessible for RUM transactions to appear
+# - /index.html: Main page for RUM transaction tracking
+# - /dashboard.html, /FundTransfer.html: Additional pages with RUM monitoring
+#
+# TROUBLESHOOTING NOTES:
+# - If login-page-load transactions don't appear in APM, check:
+#   1. Kong routes for /login.html (should return 200 OK)
+#   2. Kong routes for /elastic-apm-rum.js (RUM library access)
+#   3. JavaScript syntax in login.html (proper try-catch blocks)
+# - All frontend routes must use strip_path=false to preserve URL structure
+# - RUM library route is essential for APM functionality
 
 KONG_ADMIN_URL="http://localhost:8001"
 MAX_RETRIES=30
@@ -306,6 +320,18 @@ for page in "${html_pages[@]}"; do
     echo "✅ Route created for /$page"
 done
 
+# Add critical route for Elastic APM RUM library
+echo "📊 Adding Elastic APM RUM library route..."
+echo "🔗 Creating route for /elastic-apm-rum.js"
+curl -s -X POST \
+    --url "$KONG_ADMIN_URL/services/frontend-service/routes" \
+    --data "paths[]=/elastic-apm-rum.js" \
+    --data "methods[]=GET" \
+    --data "strip_path=false" \
+    --data "preserve_host=false" \
+    --data "regex_priority=5" > /dev/null
+echo "✅ Route created for /elastic-apm-rum.js (required for APM monitoring)"
+
 echo "🎉 Kong Gateway configuration completed successfully!"
 
 # Verify configuration
@@ -344,4 +370,66 @@ else
     echo "⚠️  Kong Gateway test failed - check service connectivity"
 fi
 
+# Validate critical APM routes
+echo ""
+echo "🔍 Validating critical APM routes..."
+
+# Test login.html accessibility
+login_status=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8086/login.html")
+if [ "$login_status" = "200" ]; then
+    echo "✅ login.html accessible (required for login-page-load transactions)"
+else
+    echo "❌ login.html not accessible ($login_status) - APM login transactions will fail"
+fi
+
+# Test index.html accessibility  
+index_status=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8086/index.html")
+if [ "$index_status" = "200" ]; then
+    echo "✅ index.html accessible (required for vubank-index-page-load transactions)"
+else
+    echo "❌ index.html not accessible ($index_status) - APM index transactions will fail"
+fi
+
+# Test RUM library accessibility
+rum_status=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8086/elastic-apm-rum.js")
+if [ "$rum_status" = "200" ]; then
+    echo "✅ elastic-apm-rum.js accessible (required for all APM monitoring)"
+else
+    echo "❌ elastic-apm-rum.js not accessible ($rum_status) - APM monitoring will not work"
+fi
+
+echo ""
+if [ "$login_status" = "200" ] && [ "$index_status" = "200" ] && [ "$rum_status" = "200" ]; then
+    echo "🎉 All critical APM routes are working! Both vubank-index-page-load and login-page-load transactions should appear in APM."
+else
+    echo "⚠️  Some critical routes failed - APM monitoring may be incomplete."
+fi
+
+echo "========================="
+
+# Provide troubleshooting information
+echo ""
+echo "🛠️  TROUBLESHOOTING GUIDE:"
+echo "If APM transactions are missing after Kong restart:"
+echo ""
+echo "1. Check route status:"
+echo "   curl -s http://localhost:8001/routes | jq -r '.data[] | \"\\(.service.id) \\(.paths[0] // \"no-path\")\"'"
+echo ""
+echo "2. Re-run this script to restore routes:"
+echo "   ./kong/configure-kong-auto.sh"
+echo ""
+echo "3. Verify critical routes manually:"
+echo "   curl -I http://localhost:8086/login.html"
+echo "   curl -I http://localhost:8086/index.html" 
+echo "   curl -I http://localhost:8086/elastic-apm-rum.js"
+echo ""
+echo "4. If routes are missing, recreate them:"
+echo "   # Frontend service route"
+echo "   curl -X POST http://localhost:8001/services/frontend-service/routes \\"
+echo "     --data 'paths[]=/login.html' --data 'methods[]=GET' --data 'strip_path=false'"
+echo ""
+echo "   # RUM library route"  
+echo "   curl -X POST http://localhost:8001/services/frontend-service/routes \\"
+echo "     --data 'paths[]=/elastic-apm-rum.js' --data 'methods[]=GET' --data 'strip_path=false'"
+echo ""
 echo "========================="

@@ -6,14 +6,8 @@
     <title>VuBank - Fund Transfer</title>
     
     <!-- Elastic RUM Agent -->
-    <script src="/elastic-apm-rum.js"></script>
+    <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
-        // Ensure elasticApm is available
-        if (typeof elasticApm === 'undefined') {
-            console.error('❌ Elastic APM RUM library failed to load');
-        } else {
-            console.log('✅ Elastic APM RUM library loaded successfully');
-        }
         // Initialize Elastic RUM with MAXIMUM automatic data capture
         window.elasticApm = elasticApm.init({
             // === CORE CONFIGURATION ===

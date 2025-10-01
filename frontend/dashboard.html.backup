@@ -11,15 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Elastic RUM Agent -->
-        <!-- Elastic APM RUM Agent -->
-    <script src="/elastic-apm-rum.js"></script>
+    <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
-        // Ensure elasticApm is available
-        if (typeof elasticApm === 'undefined') {
-            console.error('❌ Elastic APM RUM library failed to load');
-        } else {
-            console.log('✅ Elastic APM RUM library loaded successfully');
-        }
         // Initialize Elastic RUM with MAXIMUM automatic data capture
         window.elasticApm = elasticApm.init({
             // === CORE CONFIGURATION ===

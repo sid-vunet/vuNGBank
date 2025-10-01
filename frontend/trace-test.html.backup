@@ -5,8 +5,7 @@
     <title>Trace Propagation Test</title>
     
     <!-- Elastic RUM Agent -->
-        <!-- Elastic RUM Agent -->
-    <script src="/elastic-apm-rum.js"></script>
+    <script src="./elastic-apm-rum.js" crossorigin></script>
     <script>
         // Initialize Elastic RUM with MAXIMUM automatic data capture (NO CUSTOM INSTRUMENTATION)
         window.elasticApm = elasticApm.init({

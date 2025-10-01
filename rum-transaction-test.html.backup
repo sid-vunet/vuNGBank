@@ -126,282 +126,44 @@
 
             try {
                 log('🔧 Initializing RUM agent...');
-        // =======================================
-        // STANDARD VUBANK RUM CONFIGURATION
-        // =======================================
-
-        // ========================================
-// STANDARD VUBANK RUM CONFIGURATION
-// ========================================
-// This is the unified RUM configuration used across all HTML files
-// Only pageLoadTransactionName should be customized per page
-
-window.elasticApm = elasticApm.init({
-    // === CORE CONFIGURATION ===
-    serviceName: 'vubank-frontend',
-    serverUrl: 'http://91.203.133.240:30200',
-    serviceVersion: '1.0.0',
-    environment: 'e2e-240-dev',
-    
-    // === DISTRIBUTED TRACING ===
-    distributedTracing: true,
-    distributedTracingOrigins: [
-        // Current page origin
-        window.location.origin,
-        
-        // Frontend endpoints
-        'http://localhost:3001',
-        'http://localhost:3000',
-        
-        // Backend microservices
-        'http://login-go-service:8000',
-        'http://login-python-authenticator:8001', 
-        'http://accounts-go-service:8002',
-        'http://pdf-receipt-java-service:8003',
-        'http://payment-process-java-service:8004',
-        'http://corebanking-java-service:8005',
-        'http://payee-store-dotnet-service:5004',
-        
-        // Local development endpoints
-        'http://localhost:8000',
-        'http://localhost:8001',
-        'http://localhost:8002', 
-        'http://localhost:8003',
-        'http://localhost:8004',
-        'http://localhost:8005',
-        'http://localhost:5004',
-        
-        // APM server endpoints
-        'http://91.203.133.240:30200',
-        'http://apm-server:30200',
-        'https://91.203.133.240:30200',
-        'https://apm-server:30200',
-        
-        // Docker compose service names
-        'http://vubank-frontend:3000',
-        'http://vubank-html-frontend:80',
-        
-        // Catch-all
-        '*'
-    ],
-    
-    // === INSTRUMENTATION ===
-    disableInstrumentations: [],
-    instrumentFetch: true,
-    instrumentXMLHttpRequest: true,
-    captureHeaders: true,
-    captureBody: 'all',
-    
-    // === PAGE LOAD ===
-    capturePageLoad: true,
-    capturePageLoadSpans: true,
-    pageLoadTransactionName: 'vubank-rum-transaction-test-page-load', // TO BE REPLACED
-    pageLoadSpanId: true,
-    
-    // === USER INTERACTIONS ===
-    captureUserInteractions: true,
-    userInteractionTimeout: 5000,
-    
-    // === NAVIGATION ===
-    captureNavigation: true,
-    
-    // === ERROR CAPTURE ===
-    captureErrors: true,
-    errorThrottleLimit: 200,
-    errorThrottleInterval: 30000,
-    captureUnhandledRejections: true,
-    
-    // === PERFORMANCE ===
-    transactionSampleRate: 1.0,
-    spanSampleRate: 1.0,
-    transactionTimeout: 30000,
-    captureResourceTimings: true,
-    breakdownMetrics: true,
-    
-    // === SESSION ===
-    session: true,
-    sessionTimeout: 1800000, // 30 minutes
-    
-    // === SPAN CONFIGURATION ===
-    spanStackTraceMinDuration: 0,
-    spanCompressionEnabled: false,
-    captureSpanStackTraces: true,
-    
-    // === LOGGING ===
-    logLevel: 'debug',
-    sendCredentials: false,
-    
-    // === METADATA ===
-    sourcemapsEnabled: true,
-    propagateTracestate: true,
-    
-    // === CONTEXT ===
-    context: {
-        user: {
-            id: 'auto-detected',
-            username: 'auto-detected', 
-            email: 'auto-detected'
-        },
-        custom: {
-            application: 'vubank-frontend',
-            version: '1.0.0'
-        }
-    },
-    
-    // === LONG TASK MONITORING ===
-    longTask: {
-        threshold: 50
-    },
-    
-    // === CENTRAL CONFIGURATION ===
-    centralConfig: true,
-    
-    // === PERFORMANCE ===
-    memoryLimit: 10485760, // 10MB
-    queueLimit: 1000,
-    flushInterval: 500,
-    
-    // === EXPERIMENTAL ===
-    experimental: {
-        asyncStack: true
-    },
-    
-    // === ADVANCED ===
-    apiRequestTime: true,
-    apiRequestSize: true,
-    browserHistory: true,
-    active: true
-});
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>RUM Transaction Debug Test</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .test-section { margin: 20px 0; padding: 20px; background: #f5f5f5; border-radius: 5px; }
-        .result { margin: 10px 0; padding: 10px; border-radius: 3px; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
-        pre { background: white; padding: 10px; border: 1px solid #ddd; overflow: auto; }
-        .log { font-family: monospace; background: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 3px solid #007bff; }
-    </style>
-    
-    <!-- Load Elastic APM RUM locally -->
-    <script src="./elastic-apm-rum.js" 
-            onload="console.log('✅ Elastic APM RUM loaded successfully from local file')" 
-            onerror="console.error('❌ Failed to load local Elastic APM RUM file')"></script>
-</head>
-<body>
-    <h1>🔍 RUM Transaction Debug Test</h1>
-    
-    <div class="test-section">
-        <h3>0. Library Status Check</h3>
-        <button onclick="checkLibraryStatus()">🔍 Check if elasticApm is loaded</button>
-        <div id="library-status" class="result info">Click button to check library status</div>
-    </div>
-    
-    <div class="test-section">
-        <h3>1. RUM Initialization Status</h3>
-        <div id="rum-status" class="result info">Initializing...</div>
-        <button onclick="checkRumStatus()">Check Status</button>
-    </div>
-
-    <div class="test-section">
-        <h3>2. Create Login Transaction</h3>
-        <button onclick="testLoginTransaction()">🚀 Create Login Transaction</button>
-        <div id="transaction-result" class="result info">Click button to create transaction</div>
-        <pre id="transaction-details">No transaction created yet</pre>
-    </div>
-
-    <div class="test-section">
-        <h3>3. Debug Log</h3>
-        <button onclick="clearLogs()">Clear Logs</button>
-        <div id="debug-log"></div>
-    </div>
-
-    <div class="test-section">
-        <h3>4. Expected Service Map</h3>
-        <div class="result info">
-            <strong>For service map stitching, you need:</strong>
-            <ul>
-                <li>✅ RUM transaction (user-login) active during fetch call</li>
-                <li>✅ Fetch call to distributedTracingOrigins (localhost:8000)</li>
-                <li>✅ RUM auto-instrumentation adds trace headers</li>
-                <li>✅ Backend continues the trace (same trace ID)</li>
-                <li>✅ Both transactions appear in APM with connection</li>
-            </ul>
-        </div>
-    </div>
-
-    <script>
-        let apm;
-        let currentTransaction = null;
-        let logCounter = 0;
-
-        function log(message) {
-            logCounter++;
-            const logDiv = document.getElementById('debug-log');
-            const timestamp = new Date().toLocaleTimeString();
-            logDiv.innerHTML += `<div class="log">[${timestamp}] ${logCounter}: ${message}</div>`;
-            console.log(`[RUM Test] ${message}`);
-        }
-
-        function clearLogs() {
-            document.getElementById('debug-log').innerHTML = '';
-            logCounter = 0;
-        }
-
-        function checkLibraryStatus() {
-            const statusDiv = document.getElementById('library-status');
+        apm = elasticApm.init({
+            serviceName: 'vubank-frontend',
+            serverUrl: 'http://91.203.133.240:30200',
+            environment: 'e2e-240-dev',
             
-            if (typeof elasticApm === 'undefined') {
-                log('❌ elasticApm is not defined - library failed to load');
-                statusDiv.innerHTML = '❌ elasticApm library NOT loaded - check network connection or CDN availability';
-                statusDiv.className = 'result error';
-                
-                // Try to manually load from jsdelivr
-                log('🔄 Attempting to load from backup CDN...');
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/@elastic/apm-rum@5.12.1/dist/bundles/elastic-apm-rum.umd.min.js';
-                script.onload = () => {
-                    log('✅ Successfully loaded from backup CDN');
-                    statusDiv.innerHTML = '✅ elasticApm loaded from backup CDN';
-                    statusDiv.className = 'result success';
-                    initializeRUM();
-                };
-                script.onerror = () => {
-                    log('❌ Backup CDN also failed');
-                    statusDiv.innerHTML = '❌ Both CDNs failed - check internet connection';
-                };
-                document.head.appendChild(script);
-                
-            } else {
-                log('✅ elasticApm is available');
-                statusDiv.innerHTML = `✅ elasticApm library loaded successfully<br>Version: ${elasticApm.version || 'unknown'}`;
-                statusDiv.className = 'result success';
-                
-                if (!apm) {
-                    log('🔧 Library loaded but not initialized, initializing now...');
-                    initializeRUM();
-                }
-            }
-        }
-
-        // Wait for RUM library to load before initializing
-        function initializeRUM() {
-            if (typeof elasticApm === 'undefined') {
-                log('❌ elasticApm is not defined - RUM library not loaded');
-                document.getElementById('rum-status').innerHTML = '❌ RUM Library Not Loaded';
-                document.getElementById('rum-status').className = 'result error';
-                return false;
-            }
-
-            try {
-                log('🔧 Initializing RUM agent...');
-                log('✅ RUM agent initialized successfully');
+            // Enable distributed tracing
+            distributedTracing: true,
+            distributedTracingOrigins: [
+                'http://localhost:8000',
+                'http://localhost:8001', 
+                'http://localhost:8002',
+                'http://localhost:8003',
+                'http://localhost:8004',
+                'http://localhost:8005',
+                'http://91.203.133.240:30200',
+                'http://apm-server:30200',
+                'https://91.203.133.240:30200',
+                'https://apm-server:30200',
+                window.location.origin
+            ],
+            
+            // Enable all monitoring features
+            active: true,
+            logLevel: 'debug',
+            
+            // Capture everything
+            capturePageLoad: true,
+            capturePageLoadSpans: true,
+            captureUserInteractions: true,
+            captureErrors: true,
+            
+            // Sample rates
+            transactionSampleRate: 1.0,
+            spanSampleRate: 1.0,
+            
+            // Page load transaction
+            pageLoadTransactionName: 'rum-transaction-test-page-load'
+        });                log('✅ RUM agent initialized successfully');
                 document.getElementById('rum-status').innerHTML = '✅ RUM Agent Active';
                 document.getElementById('rum-status').className = 'result success';
                 return true;
