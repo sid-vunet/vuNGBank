@@ -62,6 +62,19 @@
             instrumentXMLHttpRequest: true, // Capture XHR requests
             captureHeaders: true,          // Capture HTTP headers
             captureBody: 'all',           // Capture request/response bodies
+
+             // === ENHANCED HTTP DATA CAPTURE ===
+            captureBodyContentTypes: [     // Specific content types to capture
+                'application/json',
+                'text/plain',
+                'text/html',
+                'application/x-www-form-urlencoded'
+            ],
+            httpRequestBodyMaxSize: 10240, // 10KB max for request bodies
+            httpResponseBodyMaxSize: 10240, // 10KB max for response bodies
+            httpRequestHeaders: true,      // Capture request headers
+            httpResponseHeaders: true,     // Capture response headers
+            
             
             // === PAGE LOAD INSTRUMENTATION ===
             capturePageLoad: true,         // Capture page load metrics
@@ -1813,6 +1826,8 @@
                         return;
                     }
 
+                    console.log('🔍 Starting payee API call...');
+                    
                     const response = await fetch(`${window.location.origin}/api/payees`, {
                         method: 'GET',
                         headers: {
@@ -1821,6 +1836,9 @@
                         }
                     });
 
+                    console.log('📡 Payee API Response Status:', response.status);
+                    console.log('📡 Payee API Response Headers:', Object.fromEntries(response.headers));
+
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
@@ -1828,10 +1846,11 @@
                     const payeesData = await response.json();
                     
                     // Debug: Log the actual API response structure
-                    console.log('Payees API Response:', payeesData);
+                    console.log('📦 Payees API Response Data:', payeesData);
+                    console.log('📦 Response size:', JSON.stringify(payeesData).length, 'characters');
                     if (payeesData.length > 0) {
-                        console.log('First payee structure:', Object.keys(payeesData[0]));
-                        console.log('First payee data:', payeesData[0]);
+                        console.log('📦 First payee structure:', Object.keys(payeesData[0]));
+                        console.log('📦 First payee data:', payeesData[0]);
                     }
                     
                     // Transform API response to match frontend format with enhanced fields

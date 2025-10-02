@@ -67,6 +67,18 @@
             instrumentXMLHttpRequest: true, // Capture XHR requests
             captureHeaders: true,          // Capture HTTP headers
             captureBody: 'all',           // Capture request/response bodies
+
+             // === ENHANCED HTTP DATA CAPTURE ===
+            captureBodyContentTypes: [     // Specific content types to capture
+                'application/json',
+                'text/plain',
+                'text/html',
+                'application/x-www-form-urlencoded'
+            ],
+            httpRequestBodyMaxSize: 10240, // 10KB max for request bodies
+            httpResponseBodyMaxSize: 10240, // 10KB max for response bodies
+            httpRequestHeaders: true,      // Capture request headers
+            httpResponseHeaders: true,     // Capture response headers
             
             // === PAGE LOAD INSTRUMENTATION ===
             capturePageLoad: true,         // Capture page load metrics
